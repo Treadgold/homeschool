@@ -1,117 +1,154 @@
-# LifeLearners.org.nz - Homeschool Event Booking System
+# 🏠 LifeLearners.org.nz - Complete Homeschool Event Management Platform
 
-A comprehensive web application for managing and booking homeschool events in New Zealand. Built with modern web technologies to provide a seamless experience for parents, children, and event organizers.
+> **The Ultimate All-in-One Solution for Homeschool Communities in New Zealand**
 
-## 🎯 Overview
+Transform your homeschool community with our comprehensive event management platform. LifeLearners.org.nz is a modern, secure, and feature-rich web application designed specifically for homeschool families, event organizers, and community leaders across New Zealand.
 
-LifeLearners is a community-driven platform that connects homeschool families across New Zealand through engaging events, workshops, and learning experiences. The system handles user registration, event management, booking processes, and administrative functions with a focus on security and user experience.
+## 🎯 Why Choose LifeLearners?
 
-## ✨ Features
+### For Homeschool Families
+- **Seamless Event Discovery** - Browse upcoming events with rich details, photos, and real-time availability
+- **Multi-Child Management** - Register multiple children with individual profiles, allergies, and special needs
+- **Smart Booking System** - Book events with instant confirmation and easy cancellation
+- **Family Dashboard** - Manage all your bookings, children's profiles, and event history in one place
+- **Mobile-First Design** - Access everything on any device, anywhere
 
-### For Parents & Families
-- **User Registration & Authentication**: Secure signup with email confirmation
-- **Profile Management**: Update personal information and manage children's profiles
-- **Event Discovery**: Browse upcoming events with detailed information
-- **Multi-Child Booking**: Book multiple children for events with individual details
-- **Booking Management**: View, modify, and cancel event bookings
-- **Child Profiles**: Store allergy information, special needs, and preferences
+### For Event Organizers & Admins
+- **Complete Event Management** - Create, edit, and manage events with rich content and image uploads
+- **Advanced Admin Dashboard** - Real-time statistics, user management, and financial tracking
+- **Payment Processing** - Integrated Stripe payment system with refund capabilities
+- **Photo Gallery Management** - Upload and manage community photos with titles and descriptions
+- **Comprehensive Analytics** - Track attendance, revenue, user engagement, and event performance
 
-### For Administrators
-- **Event Management**: Create, edit, and manage events with rich details
-- **User Administration**: Promote users to admin status and manage accounts
-- **Booking Oversight**: Monitor event registrations and participant lists
-- **Content Management**: Upload event images and manage event details
+## ✨ Feature Showcase
 
-### Technical Features
-- **Responsive Design**: Mobile-friendly interface with modern CSS
-- **Session Management**: Secure cookie-based authentication
-- **File Upload**: Event image management with automatic storage
-- **Email Integration**: Confirmation emails and notifications via SMTP
-- **Database Migrations**: Version-controlled schema changes with Alembic
+### 🎪 **Event Management System**
+- **Rich Event Creation** - Add titles, descriptions, dates, locations, capacity limits, age ranges, and costs
+- **Image Upload Support** - Attach event photos with automatic optimization and secure storage
+- **Multi-Part Events** - Support for series and multi-session events
+- **Real-Time Capacity Tracking** - Automatic booking limits and availability updates
+- **Event Categories** - Organize events by type (Science, Arts, Outdoor, etc.)
+- **Location Details** - Comprehensive venue information and directions
+
+### 👨‍👩‍👧‍👦 **Family & Child Management**
+- **Child Profiles** - Store names, ages, allergies, special needs, and additional notes
+- **Assisting Adult Tracking** - Flag children who need additional support
+- **Allergy & Medical Information** - Critical health and safety data for event organizers
+- **Family Dashboard** - Centralized view of all children and their bookings
+- **Profile Updates** - Easy editing of child information and preferences
+
+### 💳 **Payment & Financial Management**
+- **Stripe Integration** - Secure payment processing with multiple payment methods
+- **Payment Status Tracking** - Real-time payment confirmation and status updates
+- **Refund Processing** - Admin-controlled refund system with reason tracking
+- **Financial Dashboard** - Revenue tracking, payment analytics, and financial reporting
+- **Manual Payment Entry** - Support for cash payments and external transactions
+
+### 📊 **Advanced Analytics & Reporting**
+- **Real-Time Statistics** - Live dashboard with key metrics and trends
+- **Event Performance Analytics** - Track attendance, capacity utilization, and popularity
+- **User Engagement Metrics** - Monitor registration trends and user activity
+- **Financial Reporting** - Revenue analysis, payment tracking, and financial insights
+- **Export Capabilities** - Download reports in various formats for external analysis
+
+### 🖼️ **Photo Gallery System**
+- **Community Photo Sharing** - Upload and display event photos with titles and descriptions
+- **Admin Gallery Management** - Full control over photo uploads, editing, and deletion
+- **Responsive Gallery Grid** - Beautiful, mobile-friendly photo display
+- **Upload Date Tracking** - Automatic timestamping of all gallery content
+- **Image Optimization** - Automatic resizing and compression for optimal performance
+
+### 🔐 **Security & User Management**
+- **Secure Authentication** - Email confirmation, password hashing, and session management
+- **Rate Limiting** - Protection against abuse with intelligent request throttling
+- **CSRF Protection** - Form security with token validation
+- **Admin User Management** - Promote users to admin status with full system access
+- **Email Verification** - Required email confirmation for account activation
+
+### 📧 **Communication System**
+- **Automated Email Notifications** - Booking confirmations, event reminders, and updates
+- **Email Confirmation System** - Secure token-based email verification
+- **Resend Confirmation** - User-friendly email re-sending functionality
+- **SMTP Integration** - Professional email delivery with custom branding
+- **Development Email Testing** - MailHog integration for local development
 
 ## 🛠 Technology Stack
 
-### Backend
-- **FastAPI** - Modern, fast web framework for building APIs
-- **SQLAlchemy** - SQL toolkit and Object-Relational Mapping (ORM)
-- **Alembic** - Database migration tool for SQLAlchemy
-- **Passlib** - Password hashing and verification (bcrypt)
-- **ItsDangerous** - Secure token generation for email confirmation
-- **SlowAPI** - Rate limiting and throttling for API endpoints
+### **Modern Backend Architecture**
+- **FastAPI** - High-performance, modern Python web framework
+- **SQLAlchemy ORM** - Robust database abstraction and query building
+- **PostgreSQL** - Enterprise-grade relational database
+- **Alembic** - Database migration management with version control
 
-### Frontend
-- **Jinja2** - Template engine for server-side rendering
-- **Vanilla JavaScript** - Dynamic UI interactions and form handling
-- **CSS3** - Modern styling with responsive design principles
+### **Security & Authentication**
+- **Bcrypt** - Industry-standard password hashing with salt
+- **Session Management** - Secure HTTP-only cookies with encryption
+- **Rate Limiting** - IP-based request throttling with SlowAPI
+- **CSRF Protection** - Token-based form security
 
-### Database & Storage
-- **PostgreSQL** - Primary database (version 15)
-- **SQLAlchemy ORM** - Database abstraction and query building
+### **Payment & Financial**
+- **Stripe API** - World-class payment processing integration
+- **Webhook Handling** - Real-time payment event processing
+- **Refund Management** - Automated and manual refund capabilities
 
-### Authentication & Security
-- **Session Cookies** - Secure, HTTP-only session management
-- **Password Hashing** - Bcrypt-based password security
-- **Email Confirmation** - Token-based email verification system
-- **Rate Limiting** - IP-based rate limiting for authentication endpoints (slowapi)
+### **File Management & Media**
+- **Secure File Uploads** - Image validation, optimization, and secure storage
+- **Static File Serving** - Efficient delivery of images, CSS, and JavaScript
+- **UUID-based Filenames** - Secure, collision-resistant file naming
 
-### Development & Deployment
-- **Docker** - Containerized application deployment
-- **Docker Compose** - Multi-service orchestration
-- **Uvicorn** - ASGI server for FastAPI
-- **MailHog** - Email testing and development SMTP server
+### **Development & Deployment**
+- **Docker & Docker Compose** - Containerized deployment with multi-service orchestration
+- **Uvicorn** - High-performance ASGI server
+- **Environment Configuration** - Flexible configuration management
+- **Development Tools** - MailHog for email testing, hot reloading
 
-### External Integrations
-- **Stripe** - Payment processing (configured but not fully implemented)
-- **SMTP** - Email delivery system
-
-## 📁 Project Structure
+## 📁 Project Architecture
 
 ```
 homeschool/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py              # FastAPI application, routes, and business logic
-│   ├── models.py            # SQLAlchemy database models
+│   ├── main.py              # FastAPI application with all routes and business logic
+│   ├── models.py            # SQLAlchemy database models and relationships
 │   ├── database.py          # Database connection and session management
-│   ├── static/              # Static assets (images, videos, CSS)
-│   │   ├── event_images/    # Uploaded event images
-│   │   └── videos/          # Video content
+│   ├── static/              # Static assets and uploaded content
+│   │   ├── event_images/    # Event photos with secure storage
+│   │   ├── gallery/         # Community photo gallery
+│   │   ├── videos/          # Video content and media
+│   │   └── style.css        # Modern, responsive styling
 │   └── templates/           # Jinja2 HTML templates
-│       ├── base.html        # Base template with navigation
-│       ├── landing.html     # Homepage with video hero
-│       ├── events/          # Event-related templates
-│       ├── auth/            # Authentication templates
-│       └── admin/           # Administrative templates
-├── alembic/                 # Database migrations
-│   ├── versions/            # Migration files
-│   ├── env.py              # Alembic environment configuration
-│   └── script.py.mako      # Migration template
-├── requirements.txt         # Python dependencies
+│       ├── base.html        # Base template with navigation and layout
+│       ├── landing.html     # Homepage with video hero section
+│       ├── admin_*.html     # Comprehensive admin interface templates
+│       ├── auth/            # Authentication and user management
+│       └── events/          # Event-related templates
+├── alembic/                 # Database migration management
+│   ├── versions/            # Migration files with version control
+│   └── env.py              # Alembic environment configuration
+├── requirements.txt         # Python dependencies and versions
 ├── docker-compose.yml       # Multi-container orchestration
 ├── Dockerfile              # Application container definition
-├── alembic.ini             # Alembic configuration
-└── readme.md               # This file
+└── readme.md               # This comprehensive documentation
 ```
 
-## 🚀 Quick Start
+## 🚀 Quick Start Guide
 
-### Prerequisites
+### **Prerequisites**
 - Docker and Docker Compose
 - Git
 
-### 1. Clone the Repository
+### **1. Clone & Setup**
 ```bash
 git clone <repository-url>
 cd homeschool
 ```
 
-### 2. Environment Configuration
+### **2. Environment Configuration**
 Create a `.env` file in the project root:
 ```bash
-# Security
+# Security Configuration
 SECRET_KEY=your-super-secret-key-here
 
-# Database
+# Database Configuration
 DATABASE_URL=postgresql://user:pass@db:5432/homeschool
 
 # Email Configuration
@@ -128,118 +165,104 @@ TEST_ADMIN_EMAIL=testadmin@example.com
 TEST_ADMIN_PASSWORD=testadmin123
 ```
 
-### 3. Start the Application
+### **3. Launch the Application**
 ```bash
 # Build and start all services
 docker-compose up --build
 
-# The application will be available at:
-# - Main App: http://localhost:8000
-# - Email Testing: http://localhost:8025 (MailHog)
+# Access the application:
+# 🌐 Main App: http://localhost:8000
+# 📧 Email Testing: http://localhost:8025 (MailHog)
 ```
 
-### 4. Database Setup
+### **4. Database Setup**
 ```bash
 # Run database migrations
 docker-compose exec web alembic upgrade head
 ```
 
-### 5. Access the Application
-- **Homepage**: http://localhost:8000
-- **Events**: http://localhost:8000/events
-- **Signup**: http://localhost:8000/signup
-- **Login**: http://localhost:8000/login
-- **Admin Panel**: http://localhost:8000/admin/users
-
-## 🔧 Development
-
-### Local Development Setup
-```bash
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Set up PostgreSQL database
-# (Use Docker or local PostgreSQL instance)
-
-# Run migrations
-alembic upgrade head
-
-# Start development server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### Database Migrations
-```bash
-# Create a new migration
-alembic revision --autogenerate -m "Description of changes"
-
-# Apply migrations
-alembic upgrade head
-
-# Rollback migrations
-alembic downgrade -1
-```
-
-### Code Quality
-The project follows Python best practices:
-- Type hints where appropriate
-- Comprehensive error handling
-- Secure authentication patterns
-- Clean separation of concerns
+### **5. Explore the Features**
+- **🏠 Homepage**: http://localhost:8000
+- **📅 Events**: http://localhost:8000/events
+- **👤 Signup**: http://localhost:8000/signup
+- **🔐 Login**: http://localhost:8000/login
+- **📊 Admin Dashboard**: http://localhost:8000/admin
+- **🖼️ Photo Gallery**: http://localhost:8000/gallery
 
 ## 📊 Database Schema
 
-### Core Models
-- **User**: Authentication, profile information, admin status
-- **Event**: Event details, capacity, pricing, location
-- **Child**: Family member information, allergies, special needs
-- **Booking**: Event registrations with payment status
+### **Core Models & Relationships**
+- **User** - Authentication, profile information, admin status
+- **Event** - Event details, capacity, pricing, location, categories
+- **Child** - Family member information, allergies, special needs
+- **Booking** - Event registrations with payment status and volunteer info
+- **GalleryImage** - Community photos with titles and descriptions
 
-### Key Relationships
-- Users can have multiple children
-- Children can have multiple bookings
-- Events can have multiple bookings
-- Admin users can manage all content
+### **Key Features**
+- **Multi-Child Support** - Users can register multiple children
+- **Flexible Booking System** - Support for paid and free events
+- **Payment Integration** - Stripe payment processing with status tracking
+- **Admin Hierarchy** - User promotion system for community management
+- **Rich Content** - Image uploads, descriptions, and metadata
 
 ## 🔒 Security Features
 
-- **Password Security**: Bcrypt hashing with salt
-- **Session Management**: Secure HTTP-only cookies
-- **Email Verification**: Token-based confirmation system
-- **Rate Limiting**: IP-based rate limiting on authentication endpoints
-  - Signup: 5 requests per minute
-  - Login: 10 requests per minute
-  - Email confirmation: 3 requests per minute
-  - Email verification: 10 requests per minute
-- **CSRF Protection**: Form-based security measures
-- **Input Validation**: Comprehensive data validation
-- **SQL Injection Prevention**: Parameterized queries via SQLAlchemy
+### **Authentication & Authorization**
+- **Secure Password Hashing** - Bcrypt with salt for maximum security
+- **Email Confirmation** - Required email verification for account activation
+- **Session Management** - Encrypted, HTTP-only session cookies
+- **Admin Access Control** - Role-based permissions and user promotion
+
+### **Rate Limiting & Protection**
+- **Signup Protection** - 5 requests per minute per IP
+- **Login Protection** - 10 requests per minute per IP
+- **Email Confirmation** - 3 requests per minute per IP
+- **CSRF Protection** - Token validation on all forms
+
+### **Data Security**
+- **Input Validation** - Comprehensive data validation and sanitization
+- **SQL Injection Prevention** - Parameterized queries via SQLAlchemy
+- **File Upload Security** - Type validation and secure storage
+- **XSS Protection** - Content sanitization and secure templates
 
 ## 📧 Email System
 
-The application includes a complete email system:
-- **Email Confirmation**: Required for account activation
-- **Password Reset**: Secure token-based reset process
-- **Event Notifications**: Booking confirmations and updates
-- **Development Testing**: MailHog integration for local testing
+### **Automated Communications**
+- **Welcome Emails** - New user onboarding with email confirmation
+- **Booking Confirmations** - Instant booking confirmation emails
+- **Event Reminders** - Automated event reminders and updates
+- **Payment Confirmations** - Payment receipt and status updates
 
-## 🎨 User Interface
+### **Admin Notifications**
+- **New Booking Alerts** - Real-time notifications for event organizers
+- **Capacity Alerts** - Automatic notifications when events reach capacity
+- **Payment Notifications** - Instant alerts for successful payments
+- **System Monitoring** - Error alerts and system status notifications
 
-- **Responsive Design**: Works on desktop, tablet, and mobile
-- **Modern Styling**: Clean, accessible interface
-- **Dynamic Interactions**: JavaScript-enhanced user experience
-- **Progressive Enhancement**: Core functionality works without JavaScript
+## 🎨 User Experience
 
-## 🚀 Deployment
+### **Responsive Design**
+- **Mobile-First Approach** - Optimized for all device sizes
+- **Touch-Friendly Interface** - Intuitive navigation and interactions
+- **Fast Loading** - Optimized images and efficient code delivery
+- **Accessibility** - WCAG compliant design principles
 
-### Production Considerations
-- Use production-grade ASGI server (Gunicorn + Uvicorn)
-- Configure proper SMTP settings
-- Set up SSL/TLS certificates
-- Use environment-specific database configurations
-- Implement proper logging and monitoring
+### **Modern Interface**
+- **Clean, Professional Design** - Beautiful, modern UI components
+- **Intuitive Navigation** - Easy-to-use menu system and breadcrumbs
+- **Dynamic Interactions** - JavaScript-enhanced user experience
+- **Progressive Enhancement** - Core functionality works without JavaScript
 
-### Docker Production
+## 🚀 Deployment & Production
+
+### **Production Considerations**
+- **SSL/TLS Certificates** - Secure HTTPS connections
+- **Production Database** - Optimized PostgreSQL configuration
+- **Email Service** - Professional SMTP service integration
+- **Monitoring & Logging** - Application monitoring and error tracking
+- **Backup Strategy** - Automated database and file backups
+
+### **Docker Production Deployment**
 ```bash
 # Build production image
 docker build -t lifelearners:latest .
@@ -248,37 +271,53 @@ docker build -t lifelearners:latest .
 docker run -p 8000:8000 --env-file .env.prod lifelearners:latest
 ```
 
-## 🤝 Contributing
+## 🤝 Community & Support
 
+### **Getting Help**
+- **Documentation** - Comprehensive guides and tutorials
+- **Issue Tracking** - Bug reports and feature requests
+- **Community Forum** - User discussions and support
+- **Email Support** - Direct support for technical issues
+
+### **Contributing**
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-### Development Guidelines
+### **Development Guidelines**
 - Follow PEP 8 style guidelines
 - Add tests for new features
 - Update documentation as needed
 - Ensure all migrations are backward compatible
 
+## 📈 Roadmap & Future Features
+
+### **Coming Soon**
+- **Advanced Payment Features** - Subscription payments, payment plans
+- **Calendar Integration** - Google Calendar, Outlook sync
+- **SMS Notifications** - Text message alerts and reminders
+- **Waitlist Management** - Automatic waitlist promotion
+- **Event Reviews** - User ratings and feedback system
+- **API Development** - RESTful API for mobile apps and integrations
+
+### **Advanced Analytics**
+- **Predictive Analytics** - Event popularity forecasting
+- **Geographic Analysis** - Location-based insights
+- **User Behavior Tracking** - Engagement and retention metrics
+- **Financial Forecasting** - Revenue prediction and planning
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🆘 Support
+## 🎉 Ready to Transform Your Homeschool Community?
 
-For support and questions:
-- Check the TODO list for known issues and planned features
-- Review the codebase documentation
-- Open an issue for bugs or feature requests
+LifeLearners.org.nz is more than just an event booking system - it's a complete community management platform designed specifically for homeschool families in New Zealand. With our comprehensive feature set, modern technology stack, and focus on security and user experience, we're helping homeschool communities thrive.
 
-## 🔮 Roadmap
+**Get started today and see the difference LifeLearners can make for your community!**
 
-See `todo-list.md` for detailed feature roadmap including:
-- Payment integration with Stripe
-- Advanced admin dashboard
-- Waitlist functionality
-- SMS notifications
-- Calendar integration
-- Accessibility improvements
+---
+
+*Built with ❤️ for the New Zealand homeschool community*
