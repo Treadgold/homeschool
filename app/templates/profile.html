@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}User Profile – LifeLearners.org.nz{% endblock %}
+{% block extra_head %}{% endblock %}
+{% block content %}
+    <div class="container">
+        <h2>User Profile</h2>
+        {% if success %}<div class="success">{{ success }}</div>{% endif %}
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <form method="post">
+            <label>Email
+                <input type="email" name="email" value="{{ user.email }}" required autocomplete="username">
+            </label>
+            <button type="submit">Update Email</button>
+        </form>
+        <form method="post" style="margin-top:1.5rem;">
+            <label>New Password
+                <input type="password" name="password" autocomplete="new-password">
+            </label>
+            <label>Confirm Password
+                <input type="password" name="password_confirm" autocomplete="new-password">
+            </label>
+            <button type="submit">Update Password</button>
+        </form>
+        <hr style="margin:2.2rem 0;">
+        <h2 style="text-align:center; color:#2b6cb0;">Your Bookings</h2>
+        {% if bookings and bookings|length > 0 %}
+            {% set bookings_by_child = {} %}
+            {% for booking in bookings %}
+                {% set child = booking.child %}
+                {% if child.id not in bookings_by_child %}
+                    {% set _ = bookings_by_child.update({child.id: {'child': child, 'bookings': []}}) %}
+                {% endif %}
+                {% set _ = bookings_by_child[child.id]['bookings'].append(booking) %}
+            {% endfor %}
+            {% for child_id, data in bookings_by_child.items() %}
+                <div class="booking-child-block">
+                    <div class="booking-child-name">{{ data.child.name }} (Age: {{ data.child.age }})</div>
+                    <ul class="booking-list">
+                        {% for booking in data.bookings %}
+                            <li>
+                                <strong>{{ booking.event.title }}</strong> &mdash; {{ booking.event.date.strftime('%Y-%m-%d %H:%M') }}
+                                <form method="post" action="/cancel-booking" style="display:inline; margin-left:1.2rem;">
+                                    <input type="hidden" name="booking_id" value="{{ booking.id }}">
+                                    <button type="submit" class="cancel-btn">Cancel</button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div style="text-align:center; color:#888; margin:2rem 0;">No bookings found.</div>
+        {% endif %}
+        <a class="back-link" href="/">&larr; Back to Home</a>
+    </div>
+{% endblock %} 

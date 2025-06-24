@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+jinja2
+sqlalchemy
+psycopg2-binary
+python-dotenv
+stripe
+python-multipart
+alembic
+passlib[bcrypt]
+itsdangerous

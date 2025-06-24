@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}LifeLearners.org.nz – Home{% endblock %}
+{% block extra_head %}{% endblock %}
+{% block content %}
+    <h2>Upcoming Events</h2>
+    {% if events %}
+        <ul class="event-list">
+        {% for event in events %}
+            <li>
+                <div class="event-title">
+                    <a href="/event/{{ event.id }}" style="color: #2b6cb0; text-decoration: none;">{{ event.title }}</a>
+                </div>
+                <div class="event-meta">
+                    {{ event.date.strftime('%Y-%m-%d %H:%M') }} | {{ event.location }}
+                </div>
+                <div class="event-desc">{{ event.description }}</div>
+                <div class="event-meta">
+                    {% if event.cost %}Cost: ${{ '%.2f' % event.cost }} | {% endif %}
+                    {% if event.max_pupils %}Max pupils: {{ event.max_pupils }} | {% endif %}
+                    {% if event.min_age and event.max_age %}Ages: {{ event.min_age }}–{{ event.max_age }}{% endif %}
+                </div>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <div class="no-events">
+            <p>No events found. Please check back soon!</p>
+            <a class="cta" href="mailto:info@lifelearners.org.nz">Contact us to suggest an event</a>
+        </div>
+    {% endif %}
+{% endblock %}

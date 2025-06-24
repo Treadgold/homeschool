@@ -1,0 +1,30 @@
+version: "3.9"
+services:
+  web:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - mailhog
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: homeschool
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "8025:8025"   # Web UI
+      - "1025:1025"   # SMTP
+volumes:
+  postgres_data: 

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Admin – Create Event{% endblock %}
+{% block extra_head %}{% endblock %}
+{% block content %}
+    <div class="main-flex">
+        <div class="container form-container">
+            <h2>Create a New Event</h2>
+            {% if success %}
+                <div class="success">Event created successfully!</div>
+            {% endif %}
+            <form method="post" id="event-form" autocomplete="off" enctype="multipart/form-data">
+                <label>Title
+                    <input type="text" name="title" id="title" required>
+                </label>
+                <label>Description
+                    <textarea name="description" id="description"></textarea>
+                </label>
+                <label>Date
+                    <input type="datetime-local" name="date" id="date" required>
+                </label>
+                <label>Location
+                    <input type="text" name="location" id="location">
+                </label>
+                <label>Max Pupils
+                    <input type="number" name="max_pupils" id="max_pupils" min="1">
+                </label>
+                <label>Min Age
+                    <input type="number" name="min_age" id="min_age" min="0">
+                </label>
+                <label>Max Age
+                    <input type="number" name="max_age" id="max_age" min="0">
+                </label>
+                <label>Cost
+                    <input type="number" name="cost" id="cost" min="0" step="0.01" placeholder="0.00">
+                </label>
+                <label>Image URL
+                    <input type="url" name="image_url" id="image_url" placeholder="https://...">
+                </label>
+                <label>Image Upload
+                    <input type="file" name="image_file" id="image_file" accept="image/*">
+                </label>
+                <div class="actions">
+                    <button type="submit">Create Event</button>
+                </div>
+            </form>
+            <div style="text-align:center; margin-top:1.2rem;">
+                <a href="/">Back to Home</a>
+            </div>
+        </div>
+        <div class="container preview-container">
+            <h2 style="text-align:center; color:#2b6cb0;">Live Preview</h2>
+            <div id="event-preview">
+                <!-- Live preview will be rendered here -->
+            </div>
+        </div>
+    </div>
+    <script>
+    // Live event preview logic
+    function formatDateTime(dt) {
+        if (!dt) return '';
+        try {
+            const d = new Date(dt);
+            if (isNaN(d)) return '';
+            // Format: YYYY-MM-DD HH:mm
+            return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        } catch { return ''; }
+    }
+    let uploadedImageUrl = '';
+    function renderPreview() {
+        const title = document.getElementById('title').value || 'Event Title';
+        const description = document.getElementById('description').value || 'Event description goes here.';
+        const date = document.getElementById('date').value;
+        const location = document.getElementById('location').value || 'Location';
+        const max_pupils = document.getElementById('max_pupils').value;
+        const min_age = document.getElementById('min_age').value;
+        const max_age = document.getElementById('max_age').value;
+        const cost = document.getElementById('cost').value;
+        const image_url = document.getElementById('image_url').value;
+        let meta = '';
+        if (date) meta += formatDateTime(date);
+        if (location) meta += (meta ? ' | ' : '') + location;
+        let meta2 = '';
+        if (cost) meta2 += 'Cost: $' + parseFloat(cost).toFixed(2) + ' | ';
+        if (max_pupils) meta2 += 'Max pupils: ' + max_pupils + ' | ';
+        if (min_age && max_age) meta2 += 'Ages: ' + min_age + '–' + max_age;
+        let img = '';
+        if (uploadedImageUrl) {
+            img = `<img src="${uploadedImageUrl}" alt="Event image" class="event-image">`;
+        } else if (image_url) {
+            img = `<img src="${image_url}" alt="Event image" class="event-image">`;
+        }
+        document.getElementById('event-preview').innerHTML = `
+            <div class="event-card">
+                <div class="event-title">${title}</div>
+                ${img}
+                <div class="event-meta">${meta}</div>
+                <div class="event-desc">${description}</div>
+                <div class="event-meta">${meta2}</div>
+            </div>
+        `;
+    }
+    // Attach listeners
+    [
+        'title','description','date','location','max_pupils','min_age','max_age','cost','image_url'
+    ].forEach(id => {
+        document.getElementById(id).addEventListener('input', renderPreview);
+    });
+    // Image file upload preview
+    document.getElementById('image_file').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            uploadedImageUrl = URL.createObjectURL(file);
+        } else {
+            uploadedImageUrl = '';
+        }
+        renderPreview();
+    });
+    // Initial render
+    renderPreview();
+    </script>
+{% endblock %} 

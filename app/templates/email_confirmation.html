@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Email Confirmation – LifeLearners.org.nz{% endblock %}
+{% block extra_head %}
+<style>
+    .container {
+        max-width: 500px;
+        margin: 0 auto;
+        text-align: center;
+    }
+    .icon {
+        font-size: 4rem;
+        margin-bottom: 1.5rem;
+    }
+    .icon.success {
+        color: #38a169;
+    }
+    .icon.error {
+        color: #e53e3e;
+    }
+    .message {
+        color: #2d3748;
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+    }
+    .actions {
+        margin-top: 2rem;
+    }
+    .actions a {
+        display: inline-block;
+        padding: 0.8rem 1.5rem;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: background 0.2s;
+    }
+    .actions a.primary {
+        background: #38a169;
+        color: white;
+    }
+    .actions a.primary:hover {
+        background: #2f855a;
+    }
+    .actions a.secondary {
+        background: #edf2f7;
+        color: #4a5568;
+        margin-left: 1rem;
+    }
+    .actions a.secondary:hover {
+        background: #e2e8f0;
+    }
+</style>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <div class="icon {% if success %}success{% else %}error{% endif %}">
+            {% if success %}✓{% else %}✗{% endif %}
+        </div>
+        <h2>{% if success %}Success!{% else %}Oops!{% endif %}</h2>
+        <div class="message">
+            {{ message }}
+        </div>
+        <div class="actions">
+            {% if success %}
+                <a href="/login" class="primary">Log In</a>
+                <a href="/" class="secondary">Go to Home</a>
+            {% else %}
+                {% if message == "Invalid or expired confirmation link." %}
+                    <a href="/resend-confirmation" class="primary">Resend Confirmation</a>
+                {% endif %}
+                <a href="/" class="{% if message == 'Invalid or expired confirmation link.' %}secondary{% else %}primary{% endif %}">Go to Home</a>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %} 

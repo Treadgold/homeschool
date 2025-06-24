@@ -1,0 +1,2 @@
+# This file ensures the event_images directory is tracked by git
+# The actual image files are ignored by .gitignore 

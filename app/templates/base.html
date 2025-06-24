@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}LifeLearners.org.nz{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f7fafc;
+            margin: 0;
+            padding: 0;
+            color: #222;
+        }
+        header {
+            background: #2b6cb0;
+            color: #fff;
+            padding: 2rem 1rem 1rem 1rem;
+            text-align: center;
+        }
+        header h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 2.5rem;
+            letter-spacing: 1px;
+        }
+        header p {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+        .cta {
+            display: inline-block;
+            margin-top: 1.5rem;
+            background: #2b6cb0;
+            color: #fff;
+            padding: 0.7rem 1.5rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .cta:hover {
+            background: #224e7a;
+        }
+        .cta.cta-light {
+            background: #fff;
+            color: #2b6cb0;
+        }
+        .cta.cta-light:hover {
+            background: #e2e8f0;
+        }
+        main {
+            max-width: 700px;
+            margin: 2rem auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(44, 62, 80, 0.08);
+            padding: 2rem;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <header>
+        <h1>LifeLearners.org.nz</h1>
+        <p>Empowering homeschoolers with engaging events, workshops, and community learning in New Zealand.</p>
+        <div style="margin-top: 1.5rem;">
+            <a href="/" class="cta cta-light" style="margin-right: 0.7rem;">Home</a>
+            <a href="/events" class="cta cta-light" style="margin-right: 0.7rem;">Events</a>
+            {% if request.state.user %}
+                <a href="/profile" class="cta" style="background:#38a169; margin-right: 0.7rem;">Profile</a>
+                <a href="/logout" class="cta" style="background:#d69e2e;">Logout</a>
+            {% else %}
+                <a href="/login" class="cta" style="background:#38a169; margin-right: 0.7rem;">Login</a>
+                <a href="/signup" class="cta" style="background:#d69e2e;">Sign Up</a>
+            {% endif %}
+        </div>
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html> 

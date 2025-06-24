@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Book Event – {{ event.title }}{% endblock %}
+{% block extra_head %}{% endblock %}
+{% block content %}
+    <div class="container">
+        <h2>Book Event: {{ event.title }}</h2>
+        <div class="event-summary">
+            <strong>Date:</strong> {{ event.date.strftime('%Y-%m-%d %H:%M') }}<br>
+            <strong>Location:</strong> {{ event.location }}<br>
+            <strong>Type:</strong> {{ event.event_type|capitalize }}<br>
+            {% if event.recommended_age %}<strong>Recommended Age:</strong> {{ event.recommended_age }}+<br>{% endif %}
+            {% if event.is_multi_part %}<strong>Multi-part Workshop (Part {{ event.part_number }})</strong><br>{% endif %}
+            {% if event.cost %}<strong>Cost:</strong> ${{ '%.2f' % event.cost }}<br>{% endif %}
+        </div>
+        {% if success %}<div class="success">{{ success }}</div>{% endif %}
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        {% if success and event.recommended_age %}
+            <div class="event-summary" style="background:#fffbe6; color:#b7791f; margin-bottom:1.2rem;">
+                {% set below_age = [] %}
+                {% for child in children %}
+                    {% if child.age < event.recommended_age %}
+                        {% set _ = below_age.append(child.name) %}
+                    {% endif %}
+                {% endfor %}
+                {% if below_age %}
+                    <strong>Note:</strong> The following children are below the recommended age ({{ event.recommended_age }}). Adult assistance must accompany them: {{ below_age|join(', ') }}
+                {% endif %}
+            </div>
+        {% endif %}
+        <form method="post">
+            <div class="child-list">
+                <strong>Select your children to book:</strong><br>
+                {% for child in children %}
+                    <div class="child-checkbox">
+                        <input type="checkbox" name="child_ids" value="{{ child.id }}" id="child-{{ child.id }}">
+                        <label for="child-{{ child.id }}">{{ child.name }} (Age: {{ child.age }})</label>
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="add-child-section">
+                <strong>Add a new child:</strong>
+                <div id="new-children"></div>
+                <button type="button" class="add-child-btn" onclick="addChildForm()">Add Another Child</button>
+            </div>
+            <button type="submit">Book Selected Children</button>
+        </form>
+    </div>
+    <script>
+    let childFormCount = 0;
+    function addChildForm() {
+        const container = document.getElementById('new-children');
+        const idx = childFormCount++;
+        const div = document.createElement('div');
+        div.className = 'child-form';
+        div.innerHTML = `
+            <label>Name
+                <input type="text" name="new_child_names" required>
+            </label>
+            <label>Age
+                <input type="number" name="new_child_ages" min="0" required>
+            </label>
+            <label>Allergies
+                <input type="text" name="new_child_allergies">
+            </label>
+            <label>Notes
+                <textarea name="new_child_notes"></textarea>
+            </label>
+            <button type="button" class="remove-child-btn" onclick="this.parentElement.remove()">Remove</button>
+        `;
+        container.appendChild(div);
+    }
+    </script>
+{% endblock %} 

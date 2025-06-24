@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Login – LifeLearners.org.nz{% endblock %}
+{% block extra_head %}{% endblock %}
+{% block content %}
+    <div class="container">
+        <h2>Login</h2>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <form method="post">
+            <label>Email
+                <input type="email" name="email" required autocomplete="username">
+            </label>
+            <label>Password
+                <input type="password" name="password" required autocomplete="current-password">
+            </label>
+            <label style="flex-direction: row; align-items: center; color: #444; font-size: 0.98rem;">
+                <input type="checkbox" name="keep_logged_in"> Keep me logged in
+            </label>
+            <div class="actions">
+                <button type="submit">Login</button>
+            </div>
+        </form>
+        <div class="signup-link">
+            <span>Don't have an account? <a href="/signup">Sign up</a></span>
+        </div>
+    </div>
+{% endblock %} 

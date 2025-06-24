@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Admin – User Management{% endblock %}
+{% block extra_head %}{% endblock %}
+{% block content %}
+    <h2>User Management</h2>
+    <p>Logged in as: <strong>{{ current_user.email }}</strong> {% if current_user.is_admin %}<span class="admin">(admin)</span>{% endif %}</p>
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Email</th>
+            <th>Admin?</th>
+            <th>Actions</th>
+        </tr>
+        {% for user in users %}
+        <tr{% if user.id == current_user.id %} class="current"{% endif %}>
+            <td>{{ user.id }}</td>
+            <td>{{ user.email }}</td>
+            <td>{% if user.is_admin %}<span class="admin">Yes</span>{% else %}No{% endif %}</td>
+            <td>
+                {% if not user.is_admin %}
+                <form method="post" action="/admin/users/promote" style="display:inline;">
+                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                    <button type="submit">Promote to Admin</button>
+                </form>
+                {% else %}-{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="/">Back to Home</a>
+{% endblock %} 

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Sign Up Successful – LifeLearners.org.nz{% endblock %}
+{% block extra_head %}
+<style>
+    .container {
+        max-width: 600px;
+        margin: 0 auto;
+        text-align: center;
+    }
+    .success-icon {
+        font-size: 4rem;
+        color: #38a169;
+        margin-bottom: 1.5rem;
+    }
+    .message {
+        color: #2d3748;
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+    }
+    .email {
+        background: #f7fafc;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-family: monospace;
+        color: #4a5568;
+    }
+    .next-steps {
+        margin-top: 2rem;
+        padding: 1.5rem;
+        background: #f0fff4;
+        border: 1px solid #c6f6d5;
+        border-radius: 8px;
+        text-align: left;
+    }
+    .next-steps h3 {
+        color: #2f855a;
+        margin-top: 0;
+    }
+    .next-steps ol {
+        color: #2d3748;
+        margin: 0;
+        padding-left: 1.2rem;
+    }
+    .next-steps li {
+        margin-bottom: 0.8rem;
+    }
+    .next-steps li:last-child {
+        margin-bottom: 0;
+    }
+</style>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <div class="success-icon">✓</div>
+        <h2>Thanks for Signing Up!</h2>
+        <div class="message">
+            We've sent a confirmation email to:<br>
+            <span class="email">{{ email }}</span>
+        </div>
+        <div class="next-steps">
+            <h3>Next Steps:</h3>
+            <ol>
+                <li>Check your email inbox for the confirmation link</li>
+                <li>Click the link to verify your email address</li>
+                <li>Once confirmed, you can log in and start exploring events!</li>
+            </ol>
+        </div>
+        <p style="margin-top: 2rem; color: #718096;">
+            Didn't receive the email? Check your spam folder or <a href="/resend-confirmation">click here to resend</a>.
+        </p>
+    </div>
+{% endblock %} 

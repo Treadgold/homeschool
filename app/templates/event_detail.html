@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ event.title }} – LifeLearners.org.nz{% endblock %}
+{% block extra_head %}{% endblock %}
+{% block content %}
+    <div class="event-title">{{ event.title }}</div>
+    {% if event.image_url %}
+        <img src="{{ event.image_url }}" alt="Event image" class="event-image">
+    {% endif %}
+    <div class="event-meta">
+        {{ event.date.strftime('%Y-%m-%d %H:%M') }}
+        {% if event.location %}| {{ event.location }}{% endif %}
+    </div>
+    <div class="event-desc">{{ event.description }}</div>
+    <div class="event-details">
+        {% if event.cost is not none %}
+            <div class="event-detail">Cost: ${{ '%.2f' % event.cost }}</div>
+        {% endif %}
+        {% if event.max_pupils %}
+            <div class="event-detail">Max pupils: {{ event.max_pupils }}</div>
+        {% endif %}
+        {% if event.min_age is not none and event.max_age is not none %}
+            <div class="event-detail">Ages: {{ event.min_age }}–{{ event.max_age }}</div>
+        {% endif %}
+    </div>
+    <div style="text-align:center;">
+        <a class="cta" href="/">Back to Events</a>
+        {% if request.state.user and request.state.user.is_admin %}
+            <a class="cta" style="background:#38a169; margin-left:0.7rem;" href="/admin/events/new">Create Another Event</a>
+        {% elif request.state.user %}
+            <a class="cta" style="background:#3182ce; margin-left:0.7rem;" href="/event/{{ event.id }}/book">Book this Event</a>
+        {% endif %}
+    </div>
+{% endblock %} 
