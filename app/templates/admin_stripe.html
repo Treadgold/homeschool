@@ -1,0 +1,429 @@
+{% extends "base.html" %}
+
+{% block title %}Stripe Administration - LifeLearners.org.nz{% endblock %}
+
+{% block extra_head %}
+<style>
+    .admin-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    .admin-btn {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background: #4299e1;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        transition: background 0.2s;
+    }
+    .admin-btn:hover {
+        background: #3182ce;
+    }
+    .admin-btn.success {
+        background: #38a169;
+    }
+    .admin-btn.success:hover {
+        background: #2f855a;
+    }
+    .admin-btn.danger {
+        background: #e53e3e;
+    }
+    .admin-btn.danger:hover {
+        background: #c53030;
+    }
+    .stripe-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    .stripe-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stripe-card h3 {
+        margin: 0 0 1rem 0;
+        color: #2d3748;
+        font-size: 1.25rem;
+    }
+    .stripe-status {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        margin-bottom: 1rem;
+    }
+    .status-connected {
+        background: #c6f6d5;
+        color: #2f855a;
+    }
+    .status-disconnected {
+        background: #fed7d7;
+        color: #c53030;
+    }
+    .status-testing {
+        background: #fef5e7;
+        color: #d69e2e;
+    }
+    .webhook-log {
+        background: #f7fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        font-family: monospace;
+        font-size: 0.9rem;
+    }
+    .webhook-success {
+        border-left: 4px solid #38a169;
+    }
+    .webhook-error {
+        border-left: 4px solid #e53e3e;
+    }
+    .webhook-pending {
+        border-left: 4px solid #d69e2e;
+    }
+    .settings-form {
+        display: grid;
+        gap: 1rem;
+    }
+    .form-group {
+        display: grid;
+        gap: 0.5rem;
+    }
+    .form-group label {
+        font-weight: 500;
+        color: #2d3748;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 0.5rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+    .form-group textarea {
+        height: 100px;
+        resize: vertical;
+    }
+    .test-mode-toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 24px;
+    }
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 24px;
+    }
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    input:checked + .slider {
+        background-color: #38a169;
+    }
+    input:checked + .slider:before {
+        transform: translateX(26px);
+    }
+    .payment-methods {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    .payment-method {
+        background: #f7fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 1rem;
+        text-align: center;
+    }
+    .payment-method.enabled {
+        background: #c6f6d5;
+        border-color: #38a169;
+    }
+    .payment-method.disabled {
+        background: #fed7d7;
+        border-color: #e53e3e;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+    <h1>Stripe Administration</h1>
+    <a href="https://dashboard.stripe.com" target="_blank" class="admin-btn">Open Stripe Dashboard</a>
+</div>
+
+<!-- Stripe Connection Status -->
+<div class="stripe-grid">
+    <div class="stripe-card">
+        <h3>🔗 Connection Status</h3>
+        <div class="stripe-status status-{{ stripe_config.status }}">
+            {{ stripe_config.status.title() }}
+        </div>
+        <p>Stripe is currently {{ stripe_config.status }}. 
+        {% if stripe_config.status == 'connected' %}
+            All payment processing is active.
+        {% elif stripe_config.status == 'testing' %}
+            Running in test mode. No real charges will be processed.
+        {% else %}
+            Payment processing is disabled.
+        {% endif %}
+        </p>
+        <div class="admin-actions">
+            <a href="/admin/stripe/test-connection" class="admin-btn">Test Connection</a>
+            <a href="/admin/stripe/refresh" class="admin-btn">Refresh Status</a>
+        </div>
+    </div>
+
+    <div class="stripe-card">
+        <h3>💰 Account Balance</h3>
+        <div style="font-size: 2rem; font-weight: bold; color: #2d3748; margin-bottom: 0.5rem;">
+            ${{ "%.2f"|format(stripe_config.balance.available) }}
+        </div>
+        <div style="color: #718096; margin-bottom: 1rem;">Available Balance</div>
+        <div style="font-size: 1.2rem; color: #4a5568; margin-bottom: 0.5rem;">
+            ${{ "%.2f"|format(stripe_config.balance.pending) }}
+        </div>
+        <div style="color: #718096;">Pending Balance</div>
+    </div>
+
+    <div class="stripe-card">
+        <h3>📊 Payment Statistics</h3>
+        <div style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span>Successful Payments:</span>
+                <span style="font-weight: 600;">{{ stripe_stats.successful_payments }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span>Failed Payments:</span>
+                <span style="font-weight: 600; color: #e53e3e;">{{ stripe_stats.failed_payments }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span>Refunds Processed:</span>
+                <span style="font-weight: 600;">{{ stripe_stats.refunds_processed }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span>Dispute Rate:</span>
+                <span style="font-weight: 600;">{{ "%.2f"|format(stripe_stats.dispute_rate) }}%</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Webhook Configuration -->
+<div class="stripe-card" style="margin-bottom: 2rem;">
+    <h3>🔔 Webhook Configuration</h3>
+    <div class="test-mode-toggle">
+        <label class="toggle-switch">
+            <input type="checkbox" id="webhookEnabled" {% if stripe_config.webhooks_enabled %}checked{% endif %}>
+            <span class="slider"></span>
+        </label>
+        <span>Enable Webhooks</span>
+    </div>
+    
+    <div class="form-group">
+        <label for="webhookUrl">Webhook Endpoint URL:</label>
+        <input type="url" id="webhookUrl" value="{{ stripe_config.webhook_url }}" placeholder="https://yourdomain.com/webhook/stripe">
+    </div>
+    
+    <div class="form-group">
+        <label for="webhookSecret">Webhook Secret:</label>
+        <input type="password" id="webhookSecret" value="{{ stripe_config.webhook_secret }}" placeholder="whsec_...">
+    </div>
+    
+    <div class="admin-actions">
+        <button class="admin-btn success" onclick="saveWebhookConfig()">Save Configuration</button>
+        <button class="admin-btn" onclick="testWebhook()">Test Webhook</button>
+    </div>
+</div>
+
+<!-- Recent Webhook Logs -->
+<div class="stripe-card" style="margin-bottom: 2rem;">
+    <h3>📝 Recent Webhook Logs</h3>
+    {% if webhook_logs %}
+        {% for log in webhook_logs %}
+        <div class="webhook-log webhook-{{ log.status }}">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <strong>{{ log.event_type }}</strong>
+                <span style="color: #718096;">{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+            </div>
+            <div style="color: #4a5568; font-size: 0.8rem;">{{ log.description }}</div>
+            {% if log.error_message %}
+            <div style="color: #e53e3e; font-size: 0.8rem; margin-top: 0.5rem;">Error: {{ log.error_message }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <p style="color: #718096; text-align: center;">No webhook logs available</p>
+    {% endif %}
+    <div style="margin-top: 1rem;">
+        <a href="/admin/stripe/webhooks/logs" class="admin-btn">View All Logs</a>
+    </div>
+</div>
+
+<!-- Payment Methods -->
+<div class="stripe-card" style="margin-bottom: 2rem;">
+    <h3>💳 Payment Methods</h3>
+    <div class="payment-methods">
+        <div class="payment-method {% if 'card' in stripe_config.enabled_methods %}enabled{% else %}disabled{% endif %}">
+            <div style="font-weight: 600; margin-bottom: 0.5rem;">Credit Cards</div>
+            <div style="font-size: 0.8rem; color: #718096;">
+                {% if 'card' in stripe_config.enabled_methods %}Enabled{% else %}Disabled{% endif %}
+            </div>
+        </div>
+        <div class="payment-method {% if 'bank_transfer' in stripe_config.enabled_methods %}enabled{% else %}disabled{% endif %}">
+            <div style="font-weight: 600; margin-bottom: 0.5rem;">Bank Transfer</div>
+            <div style="font-size: 0.8rem; color: #718096;">
+                {% if 'bank_transfer' in stripe_config.enabled_methods %}Enabled{% else %}Disabled{% endif %}
+            </div>
+        </div>
+        <div class="payment-method {% if 'paynow' in stripe_config.enabled_methods %}enabled{% else %}disabled{% endif %}">
+            <div style="font-weight: 600; margin-bottom: 0.5rem;">PayNow</div>
+            <div style="font-size: 0.8rem; color: #718096;">
+                {% if 'paynow' in stripe_config.enabled_methods %}Enabled{% else %}Disabled{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- API Configuration -->
+<div class="stripe-card">
+    <h3>🔧 API Configuration</h3>
+    <form method="POST" action="/admin/stripe/update-config" class="settings-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        
+        <div class="form-group">
+            <label for="publishableKey">Publishable Key:</label>
+            <input type="text" id="publishableKey" name="publishable_key" value="{{ stripe_config.publishable_key }}" placeholder="pk_test_...">
+        </div>
+        
+        <div class="form-group">
+            <label for="secretKey">Secret Key:</label>
+            <input type="password" id="secretKey" name="secret_key" value="{{ stripe_config.secret_key }}" placeholder="sk_test_...">
+        </div>
+        
+        <div class="form-group">
+            <label for="webhookEndpoint">Webhook Endpoint:</label>
+            <input type="url" id="webhookEndpoint" name="webhook_endpoint" value="{{ stripe_config.webhook_endpoint }}" placeholder="https://yourdomain.com/webhook/stripe">
+        </div>
+        
+        <div class="form-group">
+            <label for="currency">Default Currency:</label>
+            <select id="currency" name="currency">
+                <option value="nzd" {% if stripe_config.currency == 'nzd' %}selected{% endif %}>NZD - New Zealand Dollar</option>
+                <option value="usd" {% if stripe_config.currency == 'usd' %}selected{% endif %}>USD - US Dollar</option>
+                <option value="aud" {% if stripe_config.currency == 'aud' %}selected{% endif %}>AUD - Australian Dollar</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="testMode">
+                <input type="checkbox" id="testMode" name="test_mode" {% if stripe_config.test_mode %}checked{% endif %}>
+                Enable Test Mode
+            </label>
+        </div>
+        
+        <button type="submit" class="admin-btn success">Update Configuration</button>
+    </form>
+</div>
+
+<script>
+function saveWebhookConfig() {
+    const enabled = document.getElementById('webhookEnabled').checked;
+    const url = document.getElementById('webhookUrl').value;
+    const secret = document.getElementById('webhookSecret').value;
+    
+    fetch('/admin/stripe/webhook-config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            enabled: enabled,
+            url: url,
+            secret: secret,
+            csrf_token: '{{ csrf_token }}'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Webhook configuration saved successfully!');
+        } else {
+            alert('Error saving webhook configuration: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving webhook configuration');
+    });
+}
+
+function testWebhook() {
+    fetch('/admin/stripe/test-webhook', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            csrf_token: '{{ csrf_token }}'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Webhook test sent successfully!');
+        } else {
+            alert('Error testing webhook: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error testing webhook');
+    });
+}
+
+// Auto-refresh webhook logs every 30 seconds
+setInterval(() => {
+    // You could implement AJAX to refresh webhook logs
+    console.log('Refreshing webhook logs...');
+}, 30 * 1000);
+</script>
+{% endblock %} 

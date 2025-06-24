@@ -7,5 +7,7 @@ python-dotenv
 stripe
 python-multipart
 alembic
-passlib[bcrypt]
+passlib>=1.7.4
 itsdangerous
+slowapi
+bcrypt>=4.1.2

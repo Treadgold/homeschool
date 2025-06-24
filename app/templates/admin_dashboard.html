@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - LifeLearners.org.nz{% endblock %}
+
+{% block extra_head %}
+<style>
+    .admin-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    .admin-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .admin-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .admin-card h3 {
+        margin: 0 0 1rem 0;
+        color: #2d3748;
+        font-size: 1.25rem;
+    }
+    .admin-card p {
+        color: #4a5568;
+        margin-bottom: 1rem;
+        line-height: 1.5;
+    }
+    .admin-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        text-align: center;
+    }
+    .stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    .admin-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .admin-btn {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background: #4299e1;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        transition: background 0.2s;
+    }
+    .admin-btn:hover {
+        background: #3182ce;
+    }
+    .admin-btn.danger {
+        background: #e53e3e;
+    }
+    .admin-btn.danger:hover {
+        background: #c53030;
+    }
+    .admin-btn.success {
+        background: #38a169;
+    }
+    .admin-btn.success:hover {
+        background: #2f855a;
+    }
+    .recent-activity {
+        background: #f7fafc;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-top: 2rem;
+    }
+    .activity-item {
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+    .activity-time {
+        color: #718096;
+        font-size: 0.8rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Admin Dashboard</h1>
+<p>Welcome back, {{ current_user.email }}! Here's an overview of your LifeLearners platform.</p>
+
+<!-- Statistics Overview -->
+<div class="admin-stats">
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.total_users }}</div>
+        <div class="stat-label">Total Users</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.total_events }}</div>
+        <div class="stat-label">Total Events</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.total_bookings }}</div>
+        <div class="stat-label">Total Bookings</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">${{ "%.2f"|format(stats.total_revenue) }}</div>
+        <div class="stat-label">Total Revenue</div>
+    </div>
+</div>
+
+<!-- Admin Sections -->
+<div class="admin-grid">
+    <!-- User Administration -->
+    <div class="admin-card">
+        <h3>👥 User Administration</h3>
+        <p>Manage user accounts, permissions, and access control.</p>
+        <div class="admin-actions">
+            <a href="/admin/users" class="admin-btn">View All Users</a>
+            <a href="/admin/users/promote" class="admin-btn success">Promote Users</a>
+            <a href="/admin/users/export" class="admin-btn">Export Data</a>
+        </div>
+    </div>
+
+    <!-- Event Administration -->
+    <div class="admin-card">
+        <h3>📅 Event Administration</h3>
+        <p>Create, edit, and manage events and workshops.</p>
+        <div class="admin-actions">
+            <a href="/admin/events" class="admin-btn">View All Events</a>
+            <a href="/admin/events/new" class="admin-btn success">Create Event</a>
+            <a href="/admin/events/calendar" class="admin-btn">Event Calendar</a>
+        </div>
+    </div>
+
+    <!-- Payments & Refunds -->
+    <div class="admin-card">
+        <h3>💳 Payments & Refunds</h3>
+        <p>Manage payments, process refunds, and view financial reports.</p>
+        <div class="admin-actions">
+            <a href="/admin/payments" class="admin-btn">Payment History</a>
+            <a href="/admin/refunds" class="admin-btn">Process Refunds</a>
+            <a href="/admin/payments/reports" class="admin-btn">Financial Reports</a>
+        </div>
+    </div>
+
+    <!-- Statistics & Analytics -->
+    <div class="admin-card">
+        <h3>📊 Statistics & Analytics</h3>
+        <p>View detailed analytics and performance metrics.</p>
+        <div class="admin-actions">
+            <a href="/admin/stats" class="admin-btn">View Analytics</a>
+            <a href="/admin/stats/export" class="admin-btn">Export Reports</a>
+            <a href="/admin/stats/real-time" class="admin-btn">Real-time Data</a>
+        </div>
+    </div>
+
+    <!-- Stripe Administration -->
+    <div class="admin-card">
+        <h3>🔗 Stripe Administration</h3>
+        <p>Manage Stripe integration, webhooks, and payment settings.</p>
+        <div class="admin-actions">
+            <a href="/admin/stripe" class="admin-btn">Stripe Dashboard</a>
+            <a href="/admin/stripe/webhooks" class="admin-btn">Webhook Logs</a>
+            <a href="/admin/stripe/settings" class="admin-btn">Payment Settings</a>
+        </div>
+    </div>
+
+    <!-- System Settings -->
+    <div class="admin-card">
+        <h3>⚙️ System Settings</h3>
+        <p>Configure system settings, email templates, and platform preferences.</p>
+        <div class="admin-actions">
+            <a href="/admin/settings" class="admin-btn">General Settings</a>
+            <a href="/admin/settings/email" class="admin-btn">Email Templates</a>
+            <a href="/admin/settings/security" class="admin-btn">Security</a>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="recent-activity">
+    <h3>Recent Activity</h3>
+    {% if recent_activity %}
+        {% for activity in recent_activity %}
+        <div class="activity-item">
+            <div>{{ activity.description }}</div>
+            <div class="activity-time">{{ activity.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>No recent activity to display.</p>
+    {% endif %}
+</div>
+{% endblock %} 

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>{% block title %}LifeLearners.org.nz{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
     <style>
         body {
             font-family: 'Segoe UI', Arial, sans-serif;
@@ -48,6 +49,12 @@
         .cta.cta-light:hover {
             background: #e2e8f0;
         }
+        .cta.cta-admin {
+            background: #d53f8c;
+        }
+        .cta.cta-admin:hover {
+            background: #b83280;
+        }
         main {
             max-width: 700px;
             margin: 2rem auto;
@@ -67,6 +74,9 @@
             <a href="/" class="cta cta-light" style="margin-right: 0.7rem;">Home</a>
             <a href="/events" class="cta cta-light" style="margin-right: 0.7rem;">Events</a>
             {% if request.state.user %}
+                {% if request.state.user.is_admin %}
+                    <a href="/admin" class="cta cta-admin" style="margin-right: 0.7rem;">Admin</a>
+                {% endif %}
                 <a href="/profile" class="cta" style="background:#38a169; margin-right: 0.7rem;">Profile</a>
                 <a href="/logout" class="cta" style="background:#d69e2e;">Logout</a>
             {% else %}

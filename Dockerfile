@@ -4,6 +4,11 @@ FROM python:3.12-slim-bullseye
 # Set the working directory in the container to /app
 WORKDIR /app
 
+# Install system dependencies including libmagic
+RUN apt-get update && apt-get install -y \
+    libmagic1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy requirements.txt into the container at /app
 COPY requirements.txt .
 

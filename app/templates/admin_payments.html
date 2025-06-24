@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+{% block title %}Payments & Refunds - LifeLearners.org.nz{% endblock %}
+
+{% block extra_head %}
+<style>
+    .admin-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    .admin-btn {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background: #4299e1;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        transition: background 0.2s;
+    }
+    .admin-btn:hover {
+        background: #3182ce;
+    }
+    .admin-btn.success {
+        background: #38a169;
+    }
+    .admin-btn.success:hover {
+        background: #2f855a;
+    }
+    .admin-btn.danger {
+        background: #e53e3e;
+    }
+    .admin-btn.danger:hover {
+        background: #c53030;
+    }
+    .payments-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+    }
+    .payments-table th,
+    .payments-table td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .payments-table th {
+        background: #f7fafc;
+        font-weight: 600;
+        color: #2d3748;
+    }
+    .payments-table tr:hover {
+        background: #f7fafc;
+    }
+    .payment-status {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    .status-paid {
+        background: #c6f6d5;
+        color: #2f855a;
+    }
+    .status-pending {
+        background: #fef5e7;
+        color: #d69e2e;
+    }
+    .status-failed {
+        background: #fed7d7;
+        color: #c53030;
+    }
+    .status-refunded {
+        background: #e2e8f0;
+        color: #4a5568;
+    }
+    .amount {
+        font-weight: 600;
+        color: #2d3748;
+    }
+    .amount.positive {
+        color: #2f855a;
+    }
+    .amount.negative {
+        color: #c53030;
+    }
+    .payment-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    .stat-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        text-align: center;
+    }
+    .stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #2d3748;
+        margin-bottom: 0.5rem;
+    }
+    .stat-label {
+        color: #718096;
+        font-size: 0.9rem;
+    }
+    .search-filters {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+    }
+    .search-input {
+        padding: 0.5rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        flex: 1;
+        min-width: 200px;
+    }
+    .filter-select {
+        padding: 0.5rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        background: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+    <h1>Payments & Refunds</h1>
+    <a href="/admin/payments/export" class="admin-btn">Export Data</a>
+</div>
+
+<!-- Payment Statistics -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-number">${{ "%.2f"|format(stats.total_revenue) }}</div>
+        <div class="stat-label">Total Revenue</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.total_payments }}</div>
+        <div class="stat-label">Total Payments</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">${{ "%.2f"|format(stats.total_refunds) }}</div>
+        <div class="stat-label">Total Refunds</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.pending_payments }}</div>
+        <div class="stat-label">Pending Payments</div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="search-filters">
+    <input type="text" class="search-input" placeholder="Search by email, event, or payment ID..." id="searchInput">
+    <select class="filter-select" id="statusFilter">
+        <option value="">All Status</option>
+        <option value="paid">Paid</option>
+        <option value="pending">Pending</option>
+        <option value="failed">Failed</option>
+        <option value="refunded">Refunded</option>
+    </select>
+    <select class="filter-select" id="dateFilter">
+        <option value="">All Time</option>
+        <option value="today">Today</option>
+        <option value="week">This Week</option>
+        <option value="month">This Month</option>
+        <option value="year">This Year</option>
+    </select>
+</div>
+
+<!-- Payments Table -->
+<table class="payments-table">
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>User</th>
+            <th>Event</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Payment ID</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for booking in bookings %}
+        {% if booking.payment_status != 'unpaid' %}
+        <tr>
+            <td>{{ booking.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>
+                <strong>{{ booking.child.user.email }}</strong><br>
+                <small>{{ booking.child.name }}</small>
+            </td>
+            <td>
+                <strong>{{ booking.event.title }}</strong><br>
+                <small>{{ booking.event.date.strftime('%Y-%m-%d') }}</small>
+            </td>
+            <td>
+                <span class="amount {% if booking.event.cost %}positive{% endif %}">
+                    ${{ "%.2f"|format(booking.event.cost or 0) }}
+                </span>
+            </td>
+            <td>
+                <span class="payment-status status-{{ booking.payment_status }}">
+                    {{ booking.payment_status.title() }}
+                </span>
+            </td>
+            <td>
+                {% if booking.stripe_payment_id %}
+                    <code>{{ booking.stripe_payment_id[:20] }}...</code>
+                {% else %}
+                    <span style="color: #718096;">N/A</span>
+                {% endif %}
+            </td>
+            <td>
+                <div class="payment-actions">
+                    {% if booking.payment_status == 'paid' %}
+                        <form method="POST" action="/admin/payments/{{ booking.id }}/refund" style="display: inline;" onsubmit="return confirm('Are you sure you want to process a refund?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="admin-btn danger" style="border: none; cursor: pointer;">Refund</button>
+                        </form>
+                    {% endif %}
+                    <a href="/admin/payments/{{ booking.id }}/details" class="admin-btn">Details</a>
+                </div>
+            </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if not bookings %}
+<div style="text-align: center; padding: 2rem; color: #718096;">
+    <p>No payments found.</p>
+</div>
+{% endif %}
+
+<!-- Refund Processing Section -->
+<div style="margin-top: 3rem; padding: 2rem; background: #f7fafc; border-radius: 8px;">
+    <h2>Process Manual Refund</h2>
+    <form method="POST" action="/admin/payments/manual-refund" style="display: grid; gap: 1rem; max-width: 500px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div>
+            <label for="booking_id">Booking ID:</label>
+            <input type="number" id="booking_id" name="booking_id" required style="width: 100%; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 4px;">
+        </div>
+        <div>
+            <label for="refund_amount">Refund Amount ($):</label>
+            <input type="number" id="refund_amount" name="refund_amount" step="0.01" required style="width: 100%; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 4px;">
+        </div>
+        <div>
+            <label for="refund_reason">Reason:</label>
+            <textarea id="refund_reason" name="refund_reason" required style="width: 100%; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 4px; height: 100px;"></textarea>
+        </div>
+        <button type="submit" class="admin-btn danger">Process Refund</button>
+    </form>
+</div>
+
+<script>
+// Search and filter functionality
+document.getElementById('searchInput').addEventListener('input', filterPayments);
+document.getElementById('statusFilter').addEventListener('change', filterPayments);
+document.getElementById('dateFilter').addEventListener('change', filterPayments);
+
+function filterPayments() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('statusFilter').value;
+    const dateFilter = document.getElementById('dateFilter').value;
+    
+    const rows = document.querySelectorAll('.payments-table tbody tr');
+    
+    rows.forEach(row => {
+        const user = row.cells[1].textContent.toLowerCase();
+        const event = row.cells[2].textContent.toLowerCase();
+        const status = row.cells[4].textContent.trim().toLowerCase();
+        const date = new Date(row.cells[0].textContent);
+        
+        const matchesSearch = user.includes(searchTerm) || event.includes(searchTerm);
+        const matchesStatus = !statusFilter || status.includes(statusFilter);
+        const matchesDate = !dateFilter || isDateInRange(date, dateFilter);
+        
+        row.style.display = matchesSearch && matchesStatus && matchesDate ? '' : 'none';
+    });
+}
+
+function isDateInRange(date, filter) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+    const yearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+    
+    switch(filter) {
+        case 'today':
+            return date >= today;
+        case 'week':
+            return date >= weekAgo;
+        case 'month':
+            return date >= monthAgo;
+        case 'year':
+            return date >= yearAgo;
+        default:
+            return true;
+    }
+}
+</script>
+{% endblock %} 

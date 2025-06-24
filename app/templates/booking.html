@@ -28,6 +28,7 @@
             </div>
         {% endif %}
         <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="child-list">
                 <strong>Select your children to book:</strong><br>
                 {% for child in children %}

@@ -7,12 +7,14 @@
         {% if success %}<div class="success">{{ success }}</div>{% endif %}
         {% if error %}<div class="error">{{ error }}</div>{% endif %}
         <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <label>Email
                 <input type="email" name="email" value="{{ user.email }}" required autocomplete="username">
             </label>
             <button type="submit">Update Email</button>
         </form>
         <form method="post" style="margin-top:1.5rem;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <label>New Password
                 <input type="password" name="password" autocomplete="new-password">
             </label>
@@ -40,6 +42,7 @@
                             <li>
                                 <strong>{{ booking.event.title }}</strong> &mdash; {{ booking.event.date.strftime('%Y-%m-%d %H:%M') }}
                                 <form method="post" action="/cancel-booking" style="display:inline; margin-left:1.2rem;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                     <input type="hidden" name="booking_id" value="{{ booking.id }}">
                                     <button type="submit" class="cancel-btn">Cancel</button>
                                 </form>

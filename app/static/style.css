@@ -1,0 +1,128 @@
+/* Site-wide styles for LifeLearners.org.nz */
+
+body {
+    background: #23272e;
+    color: #e2e8f0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.main-flex {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 2rem;
+    margin: 2rem auto;
+    max-width: 1200px;
+}
+
+.container {
+    background: #181a20;
+    border-radius: 12px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+    padding: 2rem 2.5rem;
+    flex: 1 1 0;
+    min-width: 340px;
+    max-width: 500px;
+}
+
+.form-container h2,
+.preview-container h2 {
+    margin-top: 0;
+    color: #e2e8f0;
+}
+
+label {
+    display: block;
+    margin-bottom: 1rem;
+    font-weight: 500;
+    color: #e2e8f0;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="datetime-local"],
+input[type="url"],
+input[type="file"],
+textarea {
+    width: 100%;
+    padding: 0.5rem;
+    margin-top: 0.3rem;
+    border-radius: 6px;
+    border: 1px solid #374151;
+    background: #23272e;
+    color: #e2e8f0;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+button[type="submit"] {
+    background: #2b6cb0;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.7rem 1.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+button[type="submit"]:hover {
+    background: #225a8d;
+}
+
+.success {
+    background: #38a169;
+    color: #fff;
+    padding: 0.7rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.event-card {
+    background: #23272e;
+    border-radius: 10px;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.12);
+    padding: 1.5rem;
+    margin-top: 1rem;
+    color: #e2e8f0;
+}
+.event-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+.event-meta {
+    color: #a0aec0;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+.event-desc {
+    margin-bottom: 0.5rem;
+}
+.event-image {
+    max-width: 100%;
+    max-height: 180px;
+    border-radius: 8px;
+    margin-bottom: 0.7rem;
+    display: block;
+}
+
+@media (max-width: 900px) {
+    .main-flex {
+        flex-direction: column;
+        gap: 1.5rem;
+        max-width: 98vw;
+    }
+    .container {
+        max-width: 98vw;
+    }
+} 

@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block title %}Statistics & Analytics - LifeLearners.org.nz{% endblock %}
+
+{% block extra_head %}
+<style>
+    .admin-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    .admin-btn {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background: #4299e1;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        transition: background 0.2s;
+    }
+    .admin-btn:hover {
+        background: #3182ce;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    .stat-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #2d3748;
+        margin-bottom: 0.5rem;
+    }
+    .stat-label {
+        color: #718096;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+    .stat-change {
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    .stat-change.positive {
+        color: #2f855a;
+    }
+    .stat-change.negative {
+        color: #c53030;
+    }
+    .chart-container {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .chart-title {
+        margin: 0 0 1rem 0;
+        color: #2d3748;
+        font-size: 1.25rem;
+    }
+    .chart-placeholder {
+        height: 300px;
+        background: #f7fafc;
+        border: 2px dashed #e2e8f0;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #718096;
+        font-style: italic;
+    }
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    .metric-item {
+        background: #f7fafc;
+        padding: 1rem;
+        border-radius: 6px;
+        text-align: center;
+    }
+    .metric-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #2d3748;
+    }
+    .metric-label {
+        font-size: 0.8rem;
+        color: #718096;
+        margin-top: 0.25rem;
+    }
+    .date-filters {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+    }
+    .date-btn {
+        padding: 0.5rem 1rem;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .date-btn.active {
+        background: #4299e1;
+        color: white;
+        border-color: #4299e1;
+    }
+    .date-btn:hover {
+        background: #f7fafc;
+    }
+    .date-btn.active:hover {
+        background: #3182ce;
+    }
+    .top-events {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .event-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .event-item:last-child {
+        border-bottom: none;
+    }
+    .event-name {
+        font-weight: 500;
+        color: #2d3748;
+    }
+    .event-stats {
+        color: #718096;
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+    <h1>Statistics & Analytics</h1>
+    <div>
+        <a href="/admin/stats/export" class="admin-btn">Export Report</a>
+        <a href="/admin/stats/real-time" class="admin-btn">Real-time Data</a>
+    </div>
+</div>
+
+<!-- Date Range Filters -->
+<div class="date-filters">
+    <button class="date-btn active" data-period="7">Last 7 Days</button>
+    <button class="date-btn" data-period="30">Last 30 Days</button>
+    <button class="date-btn" data-period="90">Last 90 Days</button>
+    <button class="date-btn" data-period="365">Last Year</button>
+    <button class="date-btn" data-period="all">All Time</button>
+</div>
+
+<!-- Key Metrics -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.total_users }}</div>
+        <div class="stat-label">Total Users</div>
+        <div class="stat-change {% if stats.user_growth > 0 %}positive{% else %}negative{% endif %}">
+            {% if stats.user_growth > 0 %}+{% endif %}{{ "%.1f"|format(stats.user_growth) }}% from last period
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.total_events }}</div>
+        <div class="stat-label">Total Events</div>
+        <div class="stat-change {% if stats.event_growth > 0 %}positive{% else %}negative{% endif %}">
+            {% if stats.event_growth > 0 %}+{% endif %}{{ "%.1f"|format(stats.event_growth) }}% from last period
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.total_bookings }}</div>
+        <div class="stat-label">Total Bookings</div>
+        <div class="stat-change {% if stats.booking_growth > 0 %}positive{% else %}negative{% endif %}">
+            {% if stats.booking_growth > 0 %}+{% endif %}{{ "%.1f"|format(stats.booking_growth) }}% from last period
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">${{ "%.2f"|format(stats.total_revenue) }}</div>
+        <div class="stat-label">Total Revenue</div>
+        <div class="stat-change {% if stats.revenue_growth > 0 %}positive{% else %}negative{% endif %}">
+            {% if stats.revenue_growth > 0 %}+{% endif %}{{ "%.1f"|format(stats.revenue_growth) }}% from last period
+        </div>
+    </div>
+</div>
+
+<!-- Performance Metrics -->
+<div class="metrics-grid">
+    <div class="metric-item">
+        <div class="metric-value">{{ "%.1f"|format(stats.avg_bookings_per_event) }}</div>
+        <div class="metric-label">Avg Bookings/Event</div>
+    </div>
+    <div class="metric-item">
+        <div class="metric-value">{{ "%.1f"|format(stats.avg_revenue_per_event) }}</div>
+        <div class="metric-label">Avg Revenue/Event</div>
+    </div>
+    <div class="metric-item">
+        <div class="metric-value">{{ "%.1f"|format(stats.conversion_rate) }}%</div>
+        <div class="metric-label">Event Conversion Rate</div>
+    </div>
+    <div class="metric-item">
+        <div class="metric-value">{{ "%.1f"|format(stats.avg_children_per_user) }}</div>
+        <div class="metric-label">Avg Children/User</div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="chart-container">
+    <h3 class="chart-title">Revenue Over Time</h3>
+    <div class="chart-placeholder">
+        Chart: Revenue trends over the selected time period
+    </div>
+</div>
+
+<div class="chart-container">
+    <h3 class="chart-title">User Growth</h3>
+    <div class="chart-placeholder">
+        Chart: User registration trends over time
+    </div>
+</div>
+
+<!-- Top Performing Events -->
+<div class="top-events">
+    <h3 class="chart-title">Top Performing Events</h3>
+    {% if top_events %}
+        {% for event in top_events %}
+        <div class="event-item">
+            <div class="event-name">{{ event.title }}</div>
+            <div class="event-stats">
+                {{ event.bookings|length }} bookings • ${{ "%.2f"|format(event.total_revenue) }} revenue
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p style="color: #718096; text-align: center;">No events data available</p>
+    {% endif %}
+</div>
+
+<!-- Recent Activity Summary -->
+<div class="chart-container">
+    <h3 class="chart-title">Recent Activity</h3>
+    {% if recent_activity %}
+        {% for activity in recent_activity %}
+        <div class="event-item">
+            <div class="event-name">{{ activity.description }}</div>
+            <div class="event-stats">{{ activity.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p style="color: #718096; text-align: center;">No recent activity</p>
+    {% endif %}
+</div>
+
+<script>
+// Date filter functionality
+document.querySelectorAll('.date-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        // Remove active class from all buttons
+        document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
+        // Add active class to clicked button
+        this.classList.add('active');
+        
+        // Get the period and update stats
+        const period = this.dataset.period;
+        updateStats(period);
+    });
+});
+
+function updateStats(period) {
+    // This would typically make an AJAX call to update the stats
+    // For now, we'll just show a placeholder
+    console.log('Updating stats for period:', period);
+    
+    // You could implement AJAX here:
+    // fetch(`/admin/stats/api?period=${period}`)
+    //     .then(response => response.json())
+    //     .then(data => {
+    //         // Update the stats display
+    //     });
+}
+
+// Auto-refresh every 5 minutes for real-time data
+setInterval(() => {
+    const activePeriod = document.querySelector('.date-btn.active').dataset.period;
+    updateStats(activePeriod);
+}, 5 * 60 * 1000);
+</script>
+{% endblock %} 

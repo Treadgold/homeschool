@@ -9,6 +9,7 @@
                 <div class="success">Event created successfully!</div>
             {% endif %}
             <form method="post" id="event-form" autocomplete="off" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <label>Title
                     <input type="text" name="title" id="title" required>
                 </label>

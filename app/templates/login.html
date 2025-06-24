@@ -1,13 +1,99 @@
 {% extends "base.html" %}
 {% block title %}Login – LifeLearners.org.nz{% endblock %}
-{% block extra_head %}{% endblock %}
+{% block extra_head %}
+<style>
+    .container {
+        max-width: 400px;
+        margin: 0 auto;
+    }
+    .error {
+        background: #fed7d7;
+        border: 1px solid #f56565;
+        color: #c53030;
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        margin-bottom: 1.5rem;
+        font-size: 0.95rem;
+    }
+    .resend-link {
+        text-align: center;
+        margin-top: 1rem;
+        font-size: 0.9rem;
+    }
+    .resend-link a {
+        color: #2b6cb0;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .resend-link a:hover {
+        text-decoration: underline;
+    }
+    form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.2rem;
+    }
+    label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        color: #2d3748;
+        font-size: 0.95rem;
+        font-weight: 500;
+    }
+    input[type="email"],
+    input[type="password"] {
+        padding: 0.6rem 0.8rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 1rem;
+        transition: border-color 0.2s;
+    }
+    input[type="email"]:focus,
+    input[type="password"]:focus {
+        outline: none;
+        border-color: #4299e1;
+        box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
+    }
+    button[type="submit"] {
+        background: #38a169;
+        color: white;
+        padding: 0.8rem;
+        border: none;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+        margin-top: 0.5rem;
+    }
+    button[type="submit"]:hover {
+        background: #2f855a;
+    }
+    .signup-link {
+        text-align: center;
+        margin-top: 1.5rem;
+        color: #4a5568;
+        font-size: 0.95rem;
+    }
+    .signup-link a {
+        color: #2b6cb0;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .signup-link a:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
 {% block content %}
     <div class="container">
         <h2>Login</h2>
         {% if error %}<div class="error">{{ error }}</div>{% endif %}
         <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <label>Email
-                <input type="email" name="email" required autocomplete="username">
+                <input type="email" name="email" required autocomplete="username" value="{{ email or '' }}">
             </label>
             <label>Password
                 <input type="password" name="password" required autocomplete="current-password">
@@ -19,8 +105,16 @@
                 <button type="submit">Login</button>
             </div>
         </form>
+        {% if error and "confirm your email" in error.lower() and email %}
+        <div class="resend-link">
+            <a href="/resend-confirmation?email={{ email | urlencode }}">Resend confirmation email</a>
+        </div>
+        {% endif %}
         <div class="signup-link">
             <span>Don't have an account? <a href="/signup">Sign up</a></span>
+        </div>
+        <div class="signup-link" style="margin-top: 0.5rem;">
+            <span>Need to resend confirmation? <a href="/resend-confirmation">Click here</a></span>
         </div>
     </div>
 {% endblock %} 

@@ -1,7 +1,28 @@
 {% extends "base.html" %}
 {% block title %}LifeLearners.org.nz – Home{% endblock %}
-{% block extra_head %}{% endblock %}
+{% block extra_head %}
+<style>
+    .hero-video {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .video-container {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+</style>
+{% endblock %}
 {% block content %}
+    <div class="video-container">
+        <video class="hero-video" autoplay muted loop playsinline>
+            <source src="/static/videos/homeschool_intro_video.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
     <h2>Welcome to LifeLearners!</h2>
     <p>We are a passionate community of homeschoolers in New Zealand, dedicated to providing enriching learning experiences, support, and connection for families. Our mission is to empower parents and children to thrive through events, courses, and shared stories.</p>
     <a class="cta" href="/events">View Upcoming Events</a>
