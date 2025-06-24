@@ -228,6 +228,60 @@
     </div>
 </div>
 
+<!-- Children Statistics -->
+<div class="chart-container">
+    <h3 class="chart-title">Children Statistics</h3>
+    <div class="metrics-grid">
+        <div class="metric-item">
+            <div class="metric-value">{{ stats.total_children }}</div>
+            <div class="metric-label">Total Children</div>
+        </div>
+        <div class="metric-item">
+            <div class="metric-value">{{ stats.users_with_children }}</div>
+            <div class="metric-label">Users with Children</div>
+        </div>
+        <div class="metric-item">
+            <div class="metric-value">{{ stats.users_without_children }}</div>
+            <div class="metric-label">Users without Children</div>
+        </div>
+        <div class="metric-item">
+            <div class="metric-value">{{ stats.children_with_allergies }}</div>
+            <div class="metric-label">Children with Allergies</div>
+        </div>
+        <div class="metric-item">
+            <div class="metric-value">{{ stats.children_needing_assistance }}</div>
+            <div class="metric-label">Need Adult Assistance</div>
+        </div>
+    </div>
+    
+    <!-- Age Distribution -->
+    <div style="margin-top: 2rem;">
+        <h4 style="color: #2d3748; margin-bottom: 1rem;">Age Distribution</h4>
+        <div class="metrics-grid">
+            <div class="metric-item">
+                <div class="metric-value">{{ stats.age_groups["0-2"] }}</div>
+                <div class="metric-label">Ages 0-2</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-value">{{ stats.age_groups["3-5"] }}</div>
+                <div class="metric-label">Ages 3-5</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-value">{{ stats.age_groups["6-8"] }}</div>
+                <div class="metric-label">Ages 6-8</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-value">{{ stats.age_groups["9-12"] }}</div>
+                <div class="metric-label">Ages 9-12</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-value">{{ stats.age_groups["13+"] }}</div>
+                <div class="metric-label">Ages 13+</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Charts Section -->
 <div class="chart-container">
     <h3 class="chart-title">Revenue Over Time</h3>

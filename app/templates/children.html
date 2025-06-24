@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Manage Children{% endblock %}
+{% block extra_head %}{% endblock %}
+{% block content %}
+    <div class="container">
+        <h2>Manage Your Children</h2>
+        <p class="text-muted">Add and manage your children's information. This will save you time when booking events.</p>
+        
+        {% if success %}<div class="success">{{ success }}</div>{% endif %}
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        
+        <!-- Add New Child Form -->
+        <div class="child-form-section">
+            <h3>Add New Child</h3>
+            <form method="post" action="/children/add">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="form-row">
+                    <label>Name
+                        <input type="text" name="name" required>
+                    </label>
+                    <label>Age
+                        <input type="number" name="age" min="0" max="18" required>
+                    </label>
+                </div>
+                <div class="form-row">
+                    <label>Allergies
+                        <input type="text" name="allergies" placeholder="e.g., nuts, dairy">
+                    </label>
+                    <label>Needs Assisting Adult
+                        <input type="checkbox" name="needs_assisting_adult" value="true">
+                    </label>
+                </div>
+                <label>Notes
+                    <textarea name="notes" placeholder="Any special needs or preferences"></textarea>
+                </label>
+                <label>Other Information
+                    <textarea name="other_info" placeholder="Additional information"></textarea>
+                </label>
+                <button type="submit">Add Child</button>
+            </form>
+        </div>
+        
+        <!-- Existing Children -->
+        {% if children %}
+            <div class="children-list">
+                <h3>Your Children ({{ children|length }})</h3>
+                {% for child in children %}
+                    <div class="child-card" id="child-{{ child.id }}">
+                        <div class="child-header">
+                            <h4>{{ child.name }} (Age: {{ child.age }})</h4>
+                            <div class="child-actions">
+                                <button type="button" class="edit-btn" onclick="toggleEditForm({{ child.id }})">Edit</button>
+                                <form method="post" action="/children/{{ child.id }}/delete" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete {{ child.name }}? This will also cancel all their bookings.')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <button type="submit" class="delete-btn">Delete</button>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        <div class="child-info">
+                            {% if child.allergies %}<p><strong>Allergies:</strong> {{ child.allergies }}</p>{% endif %}
+                            {% if child.notes %}<p><strong>Notes:</strong> {{ child.notes }}</p>{% endif %}
+                            {% if child.other_info %}<p><strong>Other Info:</strong> {{ child.other_info }}</p>{% endif %}
+                            {% if child.needs_assisting_adult %}<p><strong>Needs Assisting Adult:</strong> Yes</p>{% endif %}
+                        </div>
+                        
+                        <!-- Edit Form (Hidden by default) -->
+                        <div class="edit-form" id="edit-form-{{ child.id }}" style="display:none;">
+                            <form method="post" action="/children/{{ child.id }}/edit">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <div class="form-row">
+                                    <label>Name
+                                        <input type="text" name="name" value="{{ child.name }}" required>
+                                    </label>
+                                    <label>Age
+                                        <input type="number" name="age" value="{{ child.age }}" min="0" max="18" required>
+                                    </label>
+                                </div>
+                                <div class="form-row">
+                                    <label>Allergies
+                                        <input type="text" name="allergies" value="{{ child.allergies or '' }}" placeholder="e.g., nuts, dairy">
+                                    </label>
+                                    <label>Needs Assisting Adult
+                                        <input type="checkbox" name="needs_assisting_adult" value="true" {% if child.needs_assisting_adult %}checked{% endif %}>
+                                    </label>
+                                </div>
+                                <label>Notes
+                                    <textarea name="notes" placeholder="Any special needs or preferences">{{ child.notes or '' }}</textarea>
+                                </label>
+                                <label>Other Information
+                                    <textarea name="other_info" placeholder="Additional information">{{ child.other_info or '' }}</textarea>
+                                </label>
+                                <div class="form-actions">
+                                    <button type="submit">Save Changes</button>
+                                    <button type="button" class="cancel-btn" onclick="toggleEditForm({{ child.id }})">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="no-children">
+                <p>You haven't added any children yet. Add your first child above to get started!</p>
+            </div>
+        {% endif %}
+        
+        <a class="back-link" href="/">&larr; Back to Home</a>
+    </div>
+    
+    <script>
+    function toggleEditForm(childId) {
+        const editForm = document.getElementById(`edit-form-${childId}`);
+        const editBtn = event.target;
+        
+        if (editForm.style.display === 'none') {
+            editForm.style.display = 'block';
+            editBtn.textContent = 'Cancel';
+        } else {
+            editForm.style.display = 'none';
+            editBtn.textContent = 'Edit';
+        }
+    }
+    </script>
+{% endblock %} 

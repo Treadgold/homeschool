@@ -1,9 +1,9 @@
-from fastapi import FastAPI, Request, Depends, Form, Path, Response, Cookie, HTTPException, UploadFile, status, Query
+from fastapi import FastAPI, Request, Depends, Form, Path, Response, Cookie, HTTPException, UploadFile, status, Query, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import SessionLocal, engine
-from app.models import Base, Event, User, Child, Booking
+from app.models import Base, Event, User, Child, Booking, GalleryImage
 from starlette.status import HTTP_303_SEE_OTHER
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
@@ -470,6 +470,8 @@ async def book_event_post(
     error = None
     success = None
     booked_children = []
+    duplicate_children = []
+    
     # Book existing children
     for cid in child_ids:
         child = db.query(Child).filter(Child.id == cid, Child.user_id == user.id).first()
@@ -477,26 +479,49 @@ async def book_event_post(
             booking = Booking(event_id=event.id, child_id=child.id)
             db.add(booking)
             booked_children.append(child.name)
-    # Add and book new children
+    
+    # Add and book new children with duplicate detection
     for i, name in enumerate(new_child_names):
         if not name.strip():
             continue
+        
+        # Check for duplicate children (case-insensitive name matching)
+        existing_child = db.query(Child).filter(
+            Child.user_id == user.id,
+            Child.name.ilike(name.strip())
+        ).first()
+        
+        if existing_child:
+            duplicate_children.append(name.strip())
+            # Still book the existing child if not already selected
+            if existing_child.id not in child_ids:
+                booking = Booking(event_id=event.id, child_id=existing_child.id)
+                db.add(booking)
+                booked_children.append(existing_child.name)
+            continue
+        
         age = int(new_child_ages[i]) if i < len(new_child_ages) and new_child_ages[i] else None
         allergies = new_child_allergies[i] if i < len(new_child_allergies) else None
         notes = new_child_notes[i] if i < len(new_child_notes) else None
-        child = Child(user_id=user.id, name=name, age=age, allergies=allergies, notes=notes)
+        
+        child = Child(user_id=user.id, name=name.strip(), age=age, allergies=allergies, notes=notes)
         db.add(child)
         db.commit()
         db.refresh(child)
         booking = Booking(event_id=event.id, child_id=child.id)
         db.add(booking)
         booked_children.append(child.name)
+    
     db.commit()
     children = db.query(Child).filter(Child.user_id == user.id).all()
+    
     if booked_children:
         success = f"Booked: {', '.join(booked_children)}"
+        if duplicate_children:
+            success += f" (Note: {', '.join(duplicate_children)} already existed and were used instead)"
     else:
         error = "No children selected or added."
+    
     return templates.TemplateResponse("booking.html", {"request": request, "event": event, "user": user, "children": children, "success": success, "error": error, "csrf_token": generate_csrf_token()})
 
 @app.get("/resend-confirmation", response_class=HTMLResponse)
@@ -723,6 +748,21 @@ async def admin_stats(request: Request, user: User = Depends(require_admin), db:
     total_children = db.query(Child).count()
     avg_children_per_user = total_children / total_users if total_users > 0 else 0
     
+    # Additional child statistics
+    users_with_children = db.query(User).join(Child).distinct().count()
+    users_without_children = total_users - users_with_children
+    children_with_allergies = db.query(Child).filter(Child.allergies.isnot(None)).count()
+    children_needing_assistance = db.query(Child).filter(Child.needs_assisting_adult == True).count()
+    
+    # Age distribution of children
+    age_groups = {
+        "0-2": db.query(Child).filter(Child.age <= 2).count(),
+        "3-5": db.query(Child).filter(Child.age >= 3, Child.age <= 5).count(),
+        "6-8": db.query(Child).filter(Child.age >= 6, Child.age <= 8).count(),
+        "9-12": db.query(Child).filter(Child.age >= 9, Child.age <= 12).count(),
+        "13+": db.query(Child).filter(Child.age >= 13).count()
+    }
+    
     stats = {
         "total_users": total_users,
         "total_events": total_events,
@@ -735,7 +775,13 @@ async def admin_stats(request: Request, user: User = Depends(require_admin), db:
         "avg_bookings_per_event": avg_bookings_per_event,
         "avg_revenue_per_event": avg_revenue_per_event,
         "conversion_rate": conversion_rate,
-        "avg_children_per_user": avg_children_per_user
+        "avg_children_per_user": avg_children_per_user,
+        "total_children": total_children,
+        "users_with_children": users_with_children,
+        "users_without_children": users_without_children,
+        "children_with_allergies": children_with_allergies,
+        "children_needing_assistance": children_needing_assistance,
+        "age_groups": age_groups
     }
     
     # Get top performing events
@@ -877,3 +923,206 @@ def send_email(to_email, subject, body):
         if SMTP_USER and SMTP_PASS:
             server.login(SMTP_USER, SMTP_PASS)
         server.sendmail(msg["From"], [to_email], msg.as_string())
+
+@app.get("/children", response_class=HTMLResponse)
+async def children_get(request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    children = db.query(Child).filter(Child.user_id == user.id).all()
+    return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": None, "csrf_token": generate_csrf_token()})
+
+@app.post("/children/add", response_class=HTMLResponse)
+async def add_child(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    name: str = Form(...),
+    age: int = Form(...),
+    allergies: str = Form(None),
+    notes: str = Form(None),
+    needs_assisting_adult: bool = Form(False),
+    other_info: str = Form(None),
+    csrf_token: str = Form(None)
+):
+    if not user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
+    
+    # Check for duplicate children
+    existing_child = db.query(Child).filter(
+        Child.user_id == user.id,
+        Child.name.ilike(name.strip())
+    ).first()
+    
+    if existing_child:
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": f"A child named '{name.strip()}' already exists.", "csrf_token": generate_csrf_token()})
+    
+    child = Child(
+        user_id=user.id,
+        name=name.strip(),
+        age=age,
+        allergies=allergies,
+        notes=notes,
+        needs_assisting_adult=needs_assisting_adult,
+        other_info=other_info
+    )
+    db.add(child)
+    db.commit()
+    
+    children = db.query(Child).filter(Child.user_id == user.id).all()
+    return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": f"Child '{name.strip()}' added successfully!", "error": None, "csrf_token": generate_csrf_token()})
+
+@app.post("/children/{child_id}/edit", response_class=HTMLResponse)
+async def edit_child(
+    request: Request,
+    child_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    name: str = Form(...),
+    age: int = Form(...),
+    allergies: str = Form(None),
+    notes: str = Form(None),
+    needs_assisting_adult: bool = Form(False),
+    other_info: str = Form(None),
+    csrf_token: str = Form(None)
+):
+    if not user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
+    
+    child = db.query(Child).filter(Child.id == child_id, Child.user_id == user.id).first()
+    if not child:
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": "Child not found.", "csrf_token": generate_csrf_token()})
+    
+    # Check for duplicate names (excluding current child)
+    existing_child = db.query(Child).filter(
+        Child.user_id == user.id,
+        Child.name.ilike(name.strip()),
+        Child.id != child_id
+    ).first()
+    
+    if existing_child:
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": f"A child named '{name.strip()}' already exists.", "csrf_token": generate_csrf_token()})
+    
+    child.name = name.strip()
+    child.age = age
+    child.allergies = allergies
+    child.notes = notes
+    child.needs_assisting_adult = needs_assisting_adult
+    child.other_info = other_info
+    db.commit()
+    
+    children = db.query(Child).filter(Child.user_id == user.id).all()
+    return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": f"Child '{name.strip()}' updated successfully!", "error": None, "csrf_token": generate_csrf_token()})
+
+@app.post("/children/{child_id}/delete", response_class=HTMLResponse)
+async def delete_child(
+    request: Request,
+    child_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    csrf_token: str = Form(None)
+):
+    if not user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
+    
+    child = db.query(Child).filter(Child.id == child_id, Child.user_id == user.id).first()
+    if not child:
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": "Child not found.", "csrf_token": generate_csrf_token()})
+    
+    child_name = child.name
+    # Delete associated bookings first
+    db.query(Booking).filter(Booking.child_id == child_id).delete()
+    db.delete(child)
+    db.commit()
+    
+    children = db.query(Child).filter(Child.user_id == user.id).all()
+    return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": f"Child '{child_name}' deleted successfully!", "error": None, "csrf_token": generate_csrf_token()})
+
+@app.get("/gallery", response_class=HTMLResponse)
+async def gallery_page(request: Request, db: Session = Depends(get_db)):
+    images = db.query(GalleryImage).order_by(GalleryImage.upload_date.desc()).all()
+    return templates.TemplateResponse("gallery.html", {"request": request, "images": images})
+
+@app.get("/admin/gallery", response_class=HTMLResponse)
+async def admin_gallery_page(request: Request, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    images = db.query(GalleryImage).order_by(GalleryImage.upload_date.desc()).all()
+    return templates.TemplateResponse("admin_gallery.html", {"request": request, "images": images, "current_user": user, "csrf_token": generate_csrf_token()})
+
+@app.post("/admin/gallery/upload", response_class=HTMLResponse)
+async def upload_gallery_image(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+    title: str = Form(None),
+    description: str = Form(None),
+    image_file: UploadFile = File(...),
+    csrf_token: str = Form(None)
+):
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        images = db.query(GalleryImage).order_by(GalleryImage.upload_date.desc()).all()
+        return templates.TemplateResponse("admin_gallery.html", {"request": request, "images": images, "current_user": user, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
+    if not image_file.content_type.startswith("image/"):
+        images = db.query(GalleryImage).order_by(GalleryImage.upload_date.desc()).all()
+        return templates.TemplateResponse("admin_gallery.html", {"request": request, "images": images, "current_user": user, "error": "Only image files are allowed.", "csrf_token": generate_csrf_token()})
+    ext = image_file.filename.split('.')[-1]
+    unique_name = f"{uuid.uuid4().hex}.{ext}"
+    save_path = f"app/static/gallery/{unique_name}"
+    with open(save_path, "wb") as buffer:
+        shutil.copyfileobj(image_file.file, buffer)
+    new_image = GalleryImage(filename=unique_name, title=title, description=description)
+    db.add(new_image)
+    db.commit()
+    return RedirectResponse(url="/admin/gallery", status_code=HTTP_303_SEE_OTHER)
+
+@app.post("/admin/gallery/{image_id}/delete", response_class=HTMLResponse)
+async def delete_gallery_image(
+    request: Request,
+    image_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+    csrf_token: str = Form(None)
+):
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        images = db.query(GalleryImage).order_by(GalleryImage.upload_date.desc()).all()
+        return templates.TemplateResponse("admin_gallery.html", {"request": request, "images": images, "current_user": user, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
+    image = db.query(GalleryImage).filter(GalleryImage.id == image_id).first()
+    if image:
+        try:
+            os.remove(f"app/static/gallery/{image.filename}")
+        except Exception:
+            pass
+        db.delete(image)
+        db.commit()
+    return RedirectResponse(url="/admin/gallery", status_code=HTTP_303_SEE_OTHER)
+
+@app.post("/admin/gallery/{image_id}/edit", response_class=HTMLResponse)
+async def edit_gallery_image(
+    request: Request,
+    image_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+    title: str = Form(...),
+    description: str = Form(...),
+    csrf_token: str = Form(None)
+):
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        images = db.query(GalleryImage).order_by(GalleryImage.upload_date.desc()).all()
+        return templates.TemplateResponse("admin_gallery.html", {"request": request, "images": images, "current_user": user, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
+    image = db.query(GalleryImage).filter(GalleryImage.id == image_id).first()
+    if image:
+        image.title = title
+        image.description = description
+        db.commit()
+    return RedirectResponse(url="/admin/gallery", status_code=HTTP_303_SEE_OTHER)

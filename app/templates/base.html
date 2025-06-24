@@ -73,7 +73,9 @@
         <div style="margin-top: 1.5rem;">
             <a href="/" class="cta cta-light" style="margin-right: 0.7rem;">Home</a>
             <a href="/events" class="cta cta-light" style="margin-right: 0.7rem;">Events</a>
+            <a href="/gallery" class="cta cta-light" style="margin-right: 0.7rem;">Gallery</a>
             {% if request.state.user %}
+                <a href="/children" class="cta cta-light" style="margin-right: 0.7rem;">Children</a>
                 {% if request.state.user.is_admin %}
                     <a href="/admin" class="cta cta-admin" style="margin-right: 0.7rem;">Admin</a>
                 {% endif %}

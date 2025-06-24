@@ -1,8 +1,8 @@
 /* Site-wide styles for LifeLearners.org.nz */
 
 body {
-    background: #23272e;
-    color: #e2e8f0;
+    background: #f8f9fa;
+    color: #333;
     font-family: 'Segoe UI', Arial, sans-serif;
     margin: 0;
     padding: 0;
@@ -19,26 +19,27 @@ body {
 }
 
 .container {
-    background: #181a20;
+    background: #ffffff;
     border-radius: 12px;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 16px rgba(0,0,0,0.1);
     padding: 2rem 2.5rem;
     flex: 1 1 0;
     min-width: 340px;
     max-width: 500px;
+    border: 1px solid #e9ecef;
 }
 
 .form-container h2,
 .preview-container h2 {
     margin-top: 0;
-    color: #e2e8f0;
+    color: #333;
 }
 
 label {
     display: block;
     margin-bottom: 1rem;
     font-weight: 500;
-    color: #e2e8f0;
+    color: #495057;
 }
 
 input[type="text"],
@@ -51,9 +52,9 @@ textarea {
     padding: 0.5rem;
     margin-top: 0.3rem;
     border-radius: 6px;
-    border: 1px solid #374151;
-    background: #23272e;
-    color: #e2e8f0;
+    border: 1px solid #ced4da;
+    background: #ffffff;
+    color: #333;
     font-size: 1rem;
     box-sizing: border-box;
 }
@@ -64,7 +65,7 @@ textarea {
 }
 
 button[type="submit"] {
-    background: #2b6cb0;
+    background: #007bff;
     color: #fff;
     border: none;
     border-radius: 6px;
@@ -73,40 +74,47 @@ button[type="submit"] {
     font-weight: 600;
     cursor: pointer;
     transition: background 0.2s;
+    margin-bottom: 1rem;
+    margin-top: 0.5rem;
+    display: block;
 }
 button[type="submit"]:hover {
-    background: #225a8d;
+    background: #0056b3;
 }
 
 .success {
-    background: #38a169;
-    color: #fff;
+    background: #d4edda;
+    color: #155724;
     padding: 0.7rem 1rem;
     border-radius: 6px;
     margin-bottom: 1rem;
     text-align: center;
+    border: 1px solid #c3e6cb;
 }
 
 .event-card {
-    background: #23272e;
+    background: #ffffff;
     border-radius: 10px;
-    box-shadow: 0 1px 8px rgba(0,0,0,0.12);
+    box-shadow: 0 1px 8px rgba(0,0,0,0.08);
     padding: 1.5rem;
     margin-top: 1rem;
-    color: #e2e8f0;
+    color: #333;
+    border: 1px solid #e9ecef;
 }
 .event-title {
     font-size: 1.5rem;
     font-weight: bold;
     margin-bottom: 0.5rem;
+    color: #333;
 }
 .event-meta {
-    color: #a0aec0;
+    color: #6c757d;
     font-size: 1rem;
     margin-bottom: 0.5rem;
 }
 .event-desc {
     margin-bottom: 0.5rem;
+    color: #495057;
 }
 .event-image {
     max-width: 100%;
@@ -124,5 +132,282 @@ button[type="submit"]:hover {
     }
     .container {
         max-width: 98vw;
+    }
+}
+
+/* Profile and general utility styles */
+.error {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 0.7rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    text-align: center;
+    border: 1px solid #f5c6cb;
+}
+
+.back-link {
+    display: inline-block;
+    margin-top: 1.5rem;
+    color: #6c757d;
+    text-decoration: none;
+    font-size: 1rem;
+    transition: color 0.2s;
+}
+.back-link:hover {
+    color: #007bff;
+    text-decoration: underline;
+}
+
+.container h2 {
+    color: #333;
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    opacity: 1;
+}
+
+input[type="email"],
+input[type="password"] {
+    width: 100%;
+    padding: 0.5rem;
+    margin-top: 0.3rem;
+    border-radius: 6px;
+    border: 1px solid #ced4da;
+    background: #ffffff;
+    color: #333;
+    font-size: 1rem;
+    box-sizing: border-box;
+    margin-bottom: 1rem;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #dee2e6;
+    margin: 2.2rem 0;
+}
+
+.event-summary {
+    background: none;
+    color: #495057;
+    margin-bottom: 1.2rem;
+    font-size: 1.08rem;
+    line-height: 1.6;
+}
+.event-summary strong {
+    color: #333;
+    font-weight: 600;
+}
+.child-list {
+    margin-bottom: 1.5rem;
+}
+.child-checkbox {
+    margin-bottom: 0.7rem;
+}
+.child-checkbox label {
+    display: block;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: #495057;
+}
+.child-checkbox label:hover {
+    background: #e9ecef;
+}
+.child-checkbox input[type="checkbox"] {
+    margin-right: 0.5rem;
+}
+.child-checkbox small {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+.add-child-section {
+    margin-bottom: 1.5rem;
+}
+.add-child-btn, .remove-child-btn {
+    background: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.4rem 1rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    transition: background 0.2s;
+    display: inline-block;
+}
+.add-child-btn:hover, .remove-child-btn:hover {
+    background: #0056b3;
+}
+.child-form {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+}
+
+.text-muted {
+    color: #6c757d !important;
+    opacity: 1 !important;
+}
+
+/* Ensure all containers and cards use light backgrounds */
+.container, .event-card, .child-form {
+    background: #ffffff;
+    color: #333;
+}
+
+/* Ensure headings are always readable */
+.container h2, .event-card h2, .child-form h2 {
+    color: #333;
+}
+
+/* Children management styles */
+.child-form-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    border: 1px solid #dee2e6;
+}
+
+.child-form-section h3 {
+    color: #333;
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.3rem;
+}
+
+.form-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.form-row label {
+    flex: 1;
+}
+
+.children-list h3 {
+    color: #333;
+    margin-bottom: 1rem;
+    font-size: 1.3rem;
+}
+
+.child-card {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+}
+
+.child-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.child-header h4 {
+    color: #333;
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.child-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.edit-btn, .delete-btn, .cancel-btn {
+    background: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.edit-btn:hover {
+    background: #0056b3;
+}
+
+.delete-btn {
+    background: #dc3545;
+}
+
+.delete-btn:hover {
+    background: #c82333;
+}
+
+.cancel-btn {
+    background: #6c757d;
+}
+
+.cancel-btn:hover {
+    background: #545b62;
+}
+
+.child-info p {
+    margin: 0.5rem 0;
+    color: #6c757d;
+}
+
+.child-info strong {
+    color: #333;
+}
+
+.edit-form {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-top: 1rem;
+    border: 1px solid #dee2e6;
+}
+
+.form-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.no-children {
+    text-align: center;
+    color: #6c757d;
+    margin: 2rem 0;
+    padding: 2rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+/* Responsive design for form rows */
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+    
+    .child-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .child-actions {
+        width: 100%;
+        justify-content: flex-end;
     }
 } 

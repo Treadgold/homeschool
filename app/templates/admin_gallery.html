@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Admin – Photo Gallery{% endblock %}
+{% block extra_head %}
+<style>
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+.gallery-item {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.08);
+  padding: 1rem;
+  text-align: center;
+  border: 1px solid #e9ecef;
+  position: relative;
+}
+.gallery-img {
+  max-width: 100%;
+  max-height: 180px;
+  border-radius: 8px;
+  margin-bottom: 0.7rem;
+}
+.gallery-title {
+  font-weight: bold;
+  color: #2b6cb0;
+  margin-bottom: 0.3rem;
+}
+.gallery-desc {
+  color: #495057;
+  font-size: 0.98rem;
+}
+.gallery-actions {
+  margin-top: 0.7em;
+  display: flex;
+  justify-content: center;
+  gap: 0.5em;
+}
+.edit-form {
+  margin-top: 0.5em;
+}
+</style>
+{% endblock %}
+{% block content %}
+<h2>Admin – Photo Gallery</h2>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+<h3>Upload New Image</h3>
+<form method="post" action="/admin/gallery/upload" enctype="multipart/form-data" style="margin-bottom:2em;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label>Title
+    <input type="text" name="title" maxlength="200">
+  </label>
+  <label>Description
+    <textarea name="description" maxlength="1000"></textarea>
+  </label>
+  <label>Image File
+    <input type="file" name="image_file" accept="image/*" required>
+  </label>
+  <button type="submit">Upload Image</button>
+</form>
+<h3>Gallery Images</h3>
+<div class="gallery-grid">
+  {% for image in images %}
+    <div class="gallery-item">
+      <img class="gallery-img" src="/static/gallery/{{ image.filename }}" alt="{{ image.title or 'Gallery image' }}">
+      <form class="edit-form" method="post" action="/admin/gallery/{{ image.id }}/edit">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="text" name="title" value="{{ image.title }}" maxlength="200" placeholder="Title" style="margin-bottom:0.3em; width:100%;">
+        <textarea name="description" maxlength="1000" placeholder="Description" style="width:100%;">{{ image.description }}</textarea>
+        <button type="submit" style="margin-top:0.3em;">Save</button>
+      </form>
+      <form method="post" action="/admin/gallery/{{ image.id }}/delete" onsubmit="return confirm('Delete this image?');" style="margin-top:0.3em;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" style="background:#e53e3e; color:#fff; border:none; border-radius:4px; padding:0.4em 1em;">Delete</button>
+      </form>
+      <div style="color:#888; font-size:0.85em; margin-top:0.5em;">Uploaded: {{ image.upload_date.strftime('%Y-%m-%d') }}</div>
+    </div>
+  {% endfor %}
+</div>
+<a class="back-link" href="/admin">&larr; Back to Admin Dashboard</a>
+{% endblock %} 

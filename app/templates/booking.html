@@ -30,16 +30,24 @@
         <form method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="child-list">
-                <strong>Select your children to book:</strong><br>
-                {% for child in children %}
-                    <div class="child-checkbox">
-                        <input type="checkbox" name="child_ids" value="{{ child.id }}" id="child-{{ child.id }}">
-                        <label for="child-{{ child.id }}">{{ child.name }} (Age: {{ child.age }})</label>
-                    </div>
-                {% endfor %}
+                <strong class="text-muted">Select your saved children to book:</strong><br>
+                {% if children %}
+                    {% for child in children %}
+                        <div class="child-checkbox">
+                            <input type="checkbox" name="child_ids" value="{{ child.id }}" id="child-{{ child.id }}">
+                            <label for="child-{{ child.id }}">
+                                <strong>{{ child.name }}</strong> (Age: {{ child.age }})
+                                {% if child.allergies %}<br><small class="text-muted">Allergies: {{ child.allergies }}</small>{% endif %}
+                                {% if child.needs_assisting_adult %}<br><small class="text-muted">Needs assisting adult</small>{% endif %}
+                            </label>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">No saved children found. <a href="/children" style="color: #2b6cb0;">Add your children here</a> to save time on future bookings.</p>
+                {% endif %}
             </div>
             <div class="add-child-section">
-                <strong>Add a new child:</strong>
+                <strong class="text-muted">Add a new child (will be saved for future bookings):</strong>
                 <div id="new-children"></div>
                 <button type="button" class="add-child-btn" onclick="addChildForm()">Add Another Child</button>
             </div>

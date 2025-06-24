@@ -61,4 +61,12 @@ class Booking(Base):
     payment_status = Column(String(30), default='unpaid')
     stripe_payment_id = Column(String(100), nullable=True)
     event = relationship("Event", back_populates="bookings")
-    child = relationship("Child", back_populates="bookings") 
+    child = relationship("Child", back_populates="bookings")
+
+class GalleryImage(Base):
+    __tablename__ = "gallery_images"
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255), nullable=False)
+    title = Column(String(200), nullable=True)
+    description = Column(Text, nullable=True)
+    upload_date = Column(DateTime, default=func.now()) 
