@@ -9,16 +9,65 @@
         border-radius: 12px;
         margin-bottom: 2rem;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s ease;
     }
+    
     .video-container {
         text-align: center;
         margin-bottom: 2rem;
+        position: relative;
+        display: inline-block;
+    }
+    
+    /* Hide controls by default */
+    .hero-video::-webkit-media-controls {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .hero-video::-moz-media-controls {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    /* Show controls on hover */
+    .video-container:hover .hero-video::-webkit-media-controls {
+        opacity: 1;
+    }
+    
+    .video-container:hover .hero-video::-moz-media-controls {
+        opacity: 1;
+    }
+    
+    /* Add a subtle hover effect */
+    .video-container:hover .hero-video {
+        transform: scale(1.02);
+    }
+    
+    /* Custom overlay for better control visibility */
+    .video-container::after {
+        content: "▶ Hover to show controls";
+        position: absolute;
+        bottom: 15px;
+        right: 15px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        opacity: 0.7;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+    }
+    
+    .video-container:hover::after {
+        opacity: 0;
     }
 </style>
 {% endblock %}
 {% block content %}
     <div class="video-container">
-        <video class="hero-video" autoplay muted loop playsinline>
+        <video class="hero-video" autoplay muted loop playsinline controls>
             <source src="/static/videos/homeschool_intro_video.mp4" type="video/mp4">
             Your browser does not support the video tag.
         </video>

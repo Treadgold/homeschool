@@ -1,9 +1,11 @@
 from fastapi import FastAPI, Request, Depends, Form, Path, Response, Cookie, HTTPException, UploadFile, status, Query, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.database import SessionLocal, engine
 from app.models import Base, Event, User, Child, Booking, GalleryImage
+from app.config import config
+from app.payment_service import get_payment_service
 from starlette.status import HTTP_303_SEE_OTHER
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
@@ -20,10 +22,26 @@ from email.mime.text import MIMEText
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from authlib.integrations.starlette_client import OAuth
+import requests
 
 app = FastAPI()
 # Use absolute path for templates to ensure correct resolution in Docker and local dev
 templates = Jinja2Templates(directory="app/templates")
+
+# Initialize OAuth
+oauth = OAuth()
+if config.facebook_oauth_enabled:
+    oauth.register(
+        name='facebook',
+        client_id=config.FACEBOOK_CLIENT_ID,
+        client_secret=config.FACEBOOK_CLIENT_SECRET,
+        authorize_url='https://www.facebook.com/dialog/oauth',
+        access_token_url='https://graph.facebook.com/oauth/access_token',
+        client_kwargs={
+            'scope': 'email public_profile'
+        },
+    )
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -132,7 +150,9 @@ async def landing(request: Request):
 @app.get("/events", response_class=HTMLResponse)
 async def events_page(request: Request, db: Session = Depends(get_db)):
     events = db.query(Event).all()
-    return templates.TemplateResponse("index.html", {"request": request, "events": events})
+    from datetime import datetime
+    now = datetime.utcnow()
+    return templates.TemplateResponse("events.html", {"request": request, "events": events, "now": now})
 
 @app.get("/load-message", response_class=HTMLResponse)
 async def load_message():
@@ -154,11 +174,15 @@ async def signup(request: Request, db: Session = Depends(get_db), email: str = F
     if honeypot:
         csrf_token = generate_csrf_token()
         return templates.TemplateResponse("signup.html", {"request": request, "error": "Bot detected.", "csrf_token": csrf_token})
-    if db.query(User).filter(User.email == email).first():
+    existing_user = db.query(User).filter(User.email == email).first()
+    if existing_user:
         csrf_token = generate_csrf_token()
-        return templates.TemplateResponse("signup.html", {"request": request, "error": "Email already registered.", "csrf_token": csrf_token})
+        if existing_user.auth_provider == 'facebook':
+            return templates.TemplateResponse("signup.html", {"request": request, "error": "This email is already registered with Facebook. Please use 'Continue with Facebook' to log in.", "csrf_token": csrf_token})
+        else:
+            return templates.TemplateResponse("signup.html", {"request": request, "error": "Email already registered.", "csrf_token": csrf_token})
     
-    user = User(email=email, hashed_password=get_password_hash(password), email_confirmed=False)
+    user = User(email=email, hashed_password=get_password_hash(password), email_confirmed=False, auth_provider='email')
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -240,7 +264,20 @@ async def login(request: Request, db: Session = Depends(get_db), email: str = Fo
         csrf_token = generate_csrf_token()
         return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid or missing CSRF token.", "csrf_token": csrf_token})
     user = db.query(User).filter(User.email == email).first()
-    if not user or not verify_password(password, user.hashed_password):
+    if not user:
+        csrf_token = generate_csrf_token()
+        return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials.", "csrf_token": csrf_token})
+    
+    # Check if this is a Facebook-only user
+    if user.auth_provider == 'facebook' and not user.hashed_password:
+        csrf_token = generate_csrf_token()
+        return templates.TemplateResponse("login.html", {
+            "request": request, 
+            "error": "This account was created with Facebook. Please use 'Continue with Facebook' to log in.",
+            "csrf_token": csrf_token
+        })
+    
+    if not verify_password(password, user.hashed_password):
         csrf_token = generate_csrf_token()
         return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials.", "csrf_token": csrf_token})
     
@@ -263,6 +300,152 @@ async def logout():
     response = RedirectResponse(url="/", status_code=HTTP_303_SEE_OTHER)
     response.delete_cookie(SESSION_COOKIE)
     return response
+
+@app.get("/health")
+async def health_check(db: Session = Depends(get_db)):
+    """Health check endpoint to verify database connectivity and schema status"""
+    try:
+        # Basic database connectivity check
+        db.execute("SELECT 1")
+        
+        # Check if Facebook OAuth columns exist
+        facebook_columns_exist = True
+        try:
+            result = db.execute("SELECT facebook_id FROM users LIMIT 1")
+        except Exception:
+            facebook_columns_exist = False
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "facebook_oauth_schema": "ready" if facebook_columns_exist else "migration_needed",
+            "facebook_oauth_config": "configured" if config.facebook_oauth_enabled else "not_configured"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "error",
+            "error": str(e)
+        }
+
+# Facebook OAuth Routes
+@app.get("/auth/facebook")
+async def facebook_login(request: Request):
+    if not config.facebook_oauth_enabled:
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Facebook login is not configured. Please set FACEBOOK_CLIENT_ID and FACEBOOK_CLIENT_SECRET environment variables.",
+            "csrf_token": generate_csrf_token()
+        })
+    
+    try:
+        facebook = oauth.create_client('facebook')
+        redirect_uri = config.FACEBOOK_REDIRECT_URI
+        return await facebook.authorize_redirect(request, redirect_uri)
+    except Exception as e:
+        print(f"Facebook OAuth initialization error: {e}")
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Facebook login is temporarily unavailable. Please try again later or use email login.",
+            "csrf_token": generate_csrf_token()
+        })
+
+@app.get("/auth/facebook/callback")
+async def facebook_callback(request: Request, db: Session = Depends(get_db)):
+    if not config.facebook_oauth_enabled:
+        raise HTTPException(status_code=404, detail="Facebook login not configured")
+    
+    try:
+        facebook = oauth.create_client('facebook') 
+        token = await facebook.authorize_access_token(request)
+        
+        # Get user info from Facebook
+        user_response = await facebook.get('https://graph.facebook.com/me?fields=id,email,first_name,last_name,picture', token=token)
+        facebook_user = user_response.json()
+        
+        if not facebook_user.get('email'):
+            return templates.TemplateResponse("login.html", {
+                "request": request,
+                "error": "Facebook account must have a verified email address.",
+                "csrf_token": generate_csrf_token()
+            })
+        
+        # Check if user exists by Facebook ID (handle missing columns gracefully)
+        try:
+            user = db.query(User).filter(User.facebook_id == facebook_user['id']).first()
+        except Exception as e:
+            if "does not exist" in str(e):
+                # Database hasn't been migrated yet, fall back to email-only lookup
+                user = None
+            else:
+                raise
+        
+        if not user:
+            # Check if user exists by email (to link accounts)
+            user = db.query(User).filter(User.email == facebook_user['email']).first()
+            if user:
+                # Link existing account to Facebook (if schema supports it)
+                try:
+                    user.facebook_id = facebook_user['id']
+                    user.first_name = facebook_user.get('first_name')
+                    user.last_name = facebook_user.get('last_name')
+                    user.profile_picture_url = facebook_user.get('picture', {}).get('data', {}).get('url')
+                    if hasattr(user, 'auth_provider') and user.auth_provider == 'email':
+                        user.auth_provider = 'both'  # User has both email and Facebook auth
+                except AttributeError:
+                    # Schema doesn't have Facebook fields yet - just log the user in
+                    print("Warning: Facebook fields not available in database schema. User logged in with existing account.")
+            else:
+                # Create new user
+                try:
+                    user = User(
+                        email=facebook_user['email'],
+                        facebook_id=facebook_user['id'],
+                        first_name=facebook_user.get('first_name'),
+                        last_name=facebook_user.get('last_name'),
+                        profile_picture_url=facebook_user.get('picture', {}).get('data', {}).get('url'),
+                        auth_provider='facebook',
+                        email_confirmed=True  # Facebook emails are considered verified
+                    )
+                except TypeError:
+                    # Schema doesn't have Facebook fields yet - create basic user
+                    user = User(
+                        email=facebook_user['email'],
+                        email_confirmed=True  # Facebook emails are considered verified
+                    )
+                    print("Warning: Created user without Facebook fields. Please run database migration.")
+                db.add(user)
+        else:
+            # Update existing Facebook user info (if schema supports it)
+            try:
+                user.first_name = facebook_user.get('first_name')
+                user.last_name = facebook_user.get('last_name')
+                user.profile_picture_url = facebook_user.get('picture', {}).get('data', {}).get('url')
+            except AttributeError:
+                # Schema doesn't have Facebook fields yet
+                print("Warning: Facebook fields not available for update. Please run database migration.")
+        
+        db.commit()
+        db.refresh(user)
+        
+        # Create session
+        response = RedirectResponse(url="/", status_code=HTTP_303_SEE_OTHER)
+        response.set_cookie(
+            SESSION_COOKIE, 
+            create_session_cookie(user.id), 
+            max_age=SESSION_MAX_AGE, 
+            httponly=True, 
+            samesite="lax"
+        )
+        return response
+        
+    except Exception as e:
+        print(f"Facebook OAuth error: {e}")
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Facebook login failed. Please try again.",
+            "csrf_token": generate_csrf_token()
+        })
 
 def require_admin(user=Depends(get_current_user)):
     if not user or not user.is_admin:
@@ -344,9 +527,22 @@ async def promote_user(request: Request, db: Session = Depends(get_db), user_id:
     return RedirectResponse(url="/admin/users", status_code=HTTP_303_SEE_OTHER)
 
 @app.on_event("startup")
+def startup_tasks():
+    print("🚀 Starting LifeLearners application...")
+    
+    # Check Facebook OAuth configuration
+    if config.facebook_oauth_enabled:
+        print("✅ Facebook OAuth is configured")
+    else:
+        print("⚠️  Facebook OAuth is not configured (missing FACEBOOK_CLIENT_ID or FACEBOOK_CLIENT_SECRET)")
+    
+    create_test_users()
+
 def create_test_users():
     from app.models import User
     from app.database import SessionLocal
+    from sqlalchemy.exc import ProgrammingError
+    
     test_users = [
         {
             "email": os.getenv("TEST_USER_EMAIL"),
@@ -359,16 +555,45 @@ def create_test_users():
             "is_admin": True,
         },
     ]
+    
     db = SessionLocal()
-    for u in test_users:
-        if u["email"] and u["password"]:
-            user = db.query(User).filter(User.email == u["email"]).first()
-            if not user:
-                from app.main import get_password_hash
-                user = User(email=u["email"], hashed_password=get_password_hash(u["password"]), is_admin=u["is_admin"])
-                db.add(user)
-    db.commit()
-    db.close()
+    try:
+        for u in test_users:
+            if u["email"] and u["password"]:
+                try:
+                    user = db.query(User).filter(User.email == u["email"]).first()
+                    if not user:
+                        from app.main import get_password_hash
+                        # Create user with auth_provider for newer schema, fallback for older schema
+                        try:
+                            user = User(
+                                email=u["email"], 
+                                hashed_password=get_password_hash(u["password"]), 
+                                is_admin=u["is_admin"],
+                                auth_provider='email'
+                            )
+                        except TypeError:
+                            # Fallback for older schema without auth_provider
+                            user = User(
+                                email=u["email"], 
+                                hashed_password=get_password_hash(u["password"]), 
+                                is_admin=u["is_admin"]
+                            )
+                        db.add(user)
+                except ProgrammingError as e:
+                    # Handle missing columns gracefully (e.g., before migration)
+                    if "does not exist" in str(e):
+                        print(f"Warning: Database schema appears to be outdated. Skipping test user creation.")
+                        print(f"Please run 'alembic upgrade head' to update the database schema.")
+                        break
+                    else:
+                        raise
+        db.commit()
+    except Exception as e:
+        print(f"Error during test user creation: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 @app.get("/profile", response_class=HTMLResponse)
 async def profile_get(request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -377,7 +602,9 @@ async def profile_get(request: Request, user: User = Depends(get_current_user), 
     # Get all bookings for this user (via their children)
     children = db.query(Child).filter(Child.user_id == user.id).all()
     bookings = db.query(Booking).join(Child).filter(Child.user_id == user.id).join(Event).all()
-    return templates.TemplateResponse("profile.html", {"request": request, "user": user, "children": children, "bookings": bookings, "success": None, "error": None})
+    from datetime import datetime
+    now = datetime.utcnow()
+    return templates.TemplateResponse("profile.html", {"request": request, "user": user, "children": children, "bookings": bookings, "success": None, "error": None, "now": now})
 
 @app.post("/profile", response_class=HTMLResponse)
 async def profile_post(
@@ -413,7 +640,11 @@ async def profile_post(
             db.commit()
             success = (success + " Password updated.") if success else "Password updated."
     db.refresh(user)
-    return templates.TemplateResponse("profile.html", {"request": request, "user": user, "success": success, "error": error, "csrf_token": generate_csrf_token()})
+    from datetime import datetime
+    now = datetime.utcnow()
+    children = db.query(Child).filter(Child.user_id == user.id).all()
+    bookings = db.query(Booking).join(Child).filter(Child.user_id == user.id).join(Event).all()
+    return templates.TemplateResponse("profile.html", {"request": request, "user": user, "children": children, "bookings": bookings, "success": success, "error": error, "csrf_token": generate_csrf_token(), "now": now})
 
 @app.post("/cancel-booking", response_class=HTMLResponse)
 async def cancel_booking(request: Request, booking_id: int = Form(...), csrf_token: str = Form(None), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -433,7 +664,9 @@ async def cancel_booking(request: Request, booking_id: int = Form(...), csrf_tok
     # Reload profile page with updated bookings
     children = db.query(Child).filter(Child.user_id == user.id).all()
     bookings = db.query(Booking).join(Child).filter(Child.user_id == user.id).join(Event).all()
-    return templates.TemplateResponse("profile.html", {"request": request, "user": user, "children": children, "bookings": bookings, "success": success, "error": None, "csrf_token": generate_csrf_token()})
+    from datetime import datetime
+    now = datetime.utcnow()
+    return templates.TemplateResponse("profile.html", {"request": request, "user": user, "children": children, "bookings": bookings, "success": success, "error": None, "csrf_token": generate_csrf_token(), "now": now})
 
 @app.get("/event/{event_id}/book", response_class=HTMLResponse)
 async def book_event_get(request: Request, event_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
@@ -512,6 +745,53 @@ async def book_event_post(
         db.add(booking)
         booked_children.append(child.name)
     
+    # Check if event requires payment
+    if event.cost and event.cost > 0:
+        # Calculate total cost
+        total_children = len(child_ids) + len([name for name in new_child_names if name.strip()])
+        total_cost_dollars = event.cost * total_children
+        total_cost_cents = int(total_cost_dollars * 100)
+        
+        # Create payment intent or checkout session
+        payment_service = get_payment_service()
+        booking_details = {
+            'event_id': event.id,
+            'event_title': event.title,
+            'child_count': total_children
+        }
+        
+        # For this example, we'll use Stripe Checkout (easier for initial implementation)
+        payment_result = payment_service.create_checkout_session(
+            amount_cents=total_cost_cents,
+            booking_details=booking_details,
+            customer_email=user.email,
+            success_url=f"{config.SITE_URL}/payment/success?event_id={event.id}",
+            cancel_url=f"{config.SITE_URL}/event/{event.id}/book"
+        )
+        
+        if payment_result['success']:
+            # Store temporary booking info in session or database
+            # For now, we'll commit the bookings but mark them as pending payment
+            for booking in db.query(Booking).filter(
+                Booking.event_id == event.id,
+                Booking.child_id.in_([b.child_id for b in db.query(Booking).filter(Booking.event_id == event.id)])
+            ):
+                booking.payment_status = 'pending'
+            
+            db.commit()
+            
+            # Redirect to Stripe Checkout
+            return RedirectResponse(url=payment_result['checkout_url'], status_code=HTTP_303_SEE_OTHER)
+        else:
+            error = f"Payment setup failed: {payment_result.get('error', 'Unknown error')}"
+    else:
+        # Free event - mark as paid
+        for booking in db.query(Booking).filter(
+            Booking.event_id == event.id,
+            Booking.child_id.in_([b.child_id for b in db.query(Booking).filter(Booking.event_id == event.id)])
+        ):
+            booking.payment_status = 'paid'
+    
     db.commit()
     children = db.query(Child).filter(Child.user_id == user.id).all()
     
@@ -519,6 +799,8 @@ async def book_event_post(
         success = f"Booked: {', '.join(booked_children)}"
         if duplicate_children:
             success += f" (Note: {', '.join(duplicate_children)} already existed and were used instead)"
+        if event.cost and event.cost > 0:
+            success += " - Redirecting to payment..."
     else:
         error = "No children selected or added."
     
@@ -895,6 +1177,114 @@ async def update_stripe_config(
     # For now, just redirect back
     return RedirectResponse(url="/admin/stripe", status_code=HTTP_303_SEE_OTHER)
 
+# Payment Success and Webhook Routes
+@app.get("/payment/success", response_class=HTMLResponse)
+async def payment_success(
+    request: Request, 
+    event_id: int = Query(None),
+    session_id: str = Query(None),
+    mock: str = Query(None),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    if not user:
+        return RedirectResponse(url="/login", status_code=HTTP_303_SEE_OTHER)
+    
+    # Handle successful payment - mark bookings as paid
+    # This works even without webhooks since Stripe redirects here after successful payment
+    if event_id:
+        recent_bookings = db.query(Booking).filter(
+            Booking.event_id == event_id,
+            Booking.child.has(Child.user_id == user.id),
+            Booking.payment_status == 'pending'
+        ).all()
+        
+        for booking in recent_bookings:
+            booking.payment_status = 'paid'
+            # Use session_id if available, otherwise use mock for development
+            booking.stripe_payment_id = session_id or 'checkout_session_completed'
+        
+        db.commit()
+    
+    event = db.query(Event).filter(Event.id == event_id).first() if event_id else None
+    
+    return templates.TemplateResponse("payment_success.html", {
+        "request": request,
+        "user": user,
+        "event": event,
+        "mock_mode": bool(mock)
+    })
+
+@app.get("/payment/cancel", response_class=HTMLResponse)  
+async def payment_cancel(request: Request, event_id: int = Query(None)):
+    return templates.TemplateResponse("payment_cancel.html", {
+        "request": request,
+        "event_id": event_id
+    })
+
+@app.post("/webhook/stripe")
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+    payload = await request.body()
+    sig_header = request.headers.get('stripe-signature')
+    
+    payment_service = get_payment_service()
+    webhook_result = payment_service.handle_webhook_event(payload, sig_header)
+    
+    if not webhook_result['success']:
+        raise HTTPException(status_code=400, detail=webhook_result['error'])
+    
+    event_type = webhook_result['event_type']
+    event_data = webhook_result['data']
+    
+    # Handle different webhook events
+    if event_type == 'payment_intent.succeeded':
+        payment_intent = event_data['object']
+        metadata = payment_intent.get('metadata', {})
+        
+        if metadata.get('booking_type') == 'event_booking':
+            event_id = metadata.get('event_id')
+            user_email = metadata.get('user_email')
+            
+            if event_id and user_email:
+                # Find user and update booking status
+                user = db.query(User).filter(User.email == user_email).first()
+                if user:
+                    bookings = db.query(Booking).filter(
+                        Booking.event_id == event_id,
+                        Booking.child.has(Child.user_id == user.id),
+                        Booking.payment_status == 'pending'
+                    ).all()
+                    
+                    for booking in bookings:
+                        booking.payment_status = 'paid'
+                        booking.stripe_payment_id = payment_intent['id']
+                    
+                    db.commit()
+    
+    elif event_type == 'payment_intent.payment_failed':
+        payment_intent = event_data['object']
+        metadata = payment_intent.get('metadata', {})
+        
+        if metadata.get('booking_type') == 'event_booking':
+            event_id = metadata.get('event_id')
+            user_email = metadata.get('user_email')
+            
+            if event_id and user_email:
+                user = db.query(User).filter(User.email == user_email).first()
+                if user:
+                    bookings = db.query(Booking).filter(
+                        Booking.event_id == event_id,
+                        Booking.child.has(Child.user_id == user.id),
+                        Booking.payment_status == 'pending'
+                    ).all()
+                    
+                    for booking in bookings:
+                        booking.payment_status = 'failed'
+                    
+                    db.commit()
+    
+    return {"status": "success"}
+
 class UserContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         db = SessionLocal()
@@ -1126,3 +1516,99 @@ async def edit_gallery_image(
         image.description = description
         db.commit()
     return RedirectResponse(url="/admin/gallery", status_code=HTTP_303_SEE_OTHER)
+
+@app.get("/admin/events/all", response_class=HTMLResponse)
+async def admin_all_events(request: Request, user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    # Get all events with their bookings and related data
+    events = db.query(Event).options(
+        joinedload(Event.bookings).joinedload(Booking.child).joinedload(Child.user)
+    ).order_by(Event.date.desc()).all()
+    
+    from datetime import datetime, timedelta
+    now = datetime.utcnow()
+    
+    return templates.TemplateResponse("admin_all_events.html", {
+        "request": request, 
+        "events": events, 
+        "current_user": user,
+        "now": now,
+        "timedelta": timedelta,
+        "csrf_token": generate_csrf_token()
+    })
+
+@app.get("/admin/events/calendar", response_class=HTMLResponse)
+async def admin_events_calendar(request: Request, user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    # Get all events with their bookings
+    events = db.query(Event).options(
+        joinedload(Event.bookings).joinedload(Booking.child).joinedload(Child.user)
+    ).order_by(Event.date).all()
+    
+    from datetime import datetime
+    now = datetime.utcnow()
+    
+    # Serialize events for JSON
+    serialized_events = []
+    for event in events:
+        event_dict = {
+            'id': event.id,
+            'title': event.title,
+            'description': event.description,
+            'date': event.date.isoformat() if event.date else None,
+            'location': event.location,
+            'event_type': event.event_type,
+            'cost': float(event.cost) if event.cost else None,
+            'max_pupils': event.max_pupils,
+            'recommended_age': event.recommended_age,
+            'bookings': []
+        }
+        
+        # Serialize bookings
+        for booking in event.bookings:
+            booking_dict = {
+                'id': booking.id,
+                'child': {
+                    'id': booking.child.id,
+                    'name': booking.child.name,
+                    'age': booking.child.age,
+                    'allergies': booking.child.allergies,
+                    'needs_assisting_adult': booking.child.needs_assisting_adult,
+                    'notes': booking.child.notes,
+                    'user': {
+                        'id': booking.child.user.id,
+                        'email': booking.child.user.email
+                    }
+                }
+            }
+            event_dict['bookings'].append(booking_dict)
+        
+        serialized_events.append(event_dict)
+    
+    return templates.TemplateResponse("admin_events_calendar.html", {
+        "request": request, 
+        "events": serialized_events, 
+        "current_user": user,
+        "now": now,
+        "csrf_token": generate_csrf_token()
+    })
+
+@app.get("/admin/events/{event_id}/bookings", response_class=HTMLResponse)
+async def admin_event_bookings(request: Request, event_id: int, user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    # Get the specific event with all its bookings
+    event = db.query(Event).options(
+        joinedload(Event.bookings).joinedload(Booking.child).joinedload(Child.user)
+    ).filter(Event.id == event_id).first()
+    
+    if not event:
+        return RedirectResponse(url="/admin/events/all", status_code=status.HTTP_303_SEE_OTHER)
+    
+    from datetime import datetime, timedelta
+    now = datetime.utcnow()
+    
+    return templates.TemplateResponse("admin_event_bookings.html", {
+        "request": request, 
+        "event": event, 
+        "current_user": user,
+        "now": now,
+        "timedelta": timedelta,
+        "csrf_token": generate_csrf_token()
+    })

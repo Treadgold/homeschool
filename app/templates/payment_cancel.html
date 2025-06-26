@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Cancelled - LifeLearners.org.nz{% endblock %}
+
+{% block extra_head %}
+<style>
+    .cancel-container {
+        max-width: 600px;
+        margin: 2rem auto;
+        padding: 2rem;
+        text-align: center;
+    }
+    .cancel-icon {
+        font-size: 4rem;
+        color: #e53e3e;
+        margin-bottom: 1rem;
+    }
+    .cancel-title {
+        font-size: 2rem;
+        color: #2d3748;
+        margin-bottom: 1rem;
+    }
+    .cancel-message {
+        font-size: 1.1rem;
+        color: #4a5568;
+        margin-bottom: 2rem;
+        line-height: 1.6;
+    }
+    .action-buttons {
+        margin-top: 2rem;
+    }
+    .btn {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        margin: 0.5rem;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: #2b6cb0;
+        color: white;
+    }
+    .btn-primary:hover {
+        background: #2c5aa0;
+    }
+    .btn-secondary {
+        background: #e2e8f0;
+        color: #4a5568;
+    }
+    .btn-secondary:hover {
+        background: #cbd5e0;
+    }
+    .info-box {
+        background: #ebf8ff;
+        border: 1px solid #bee3f8;
+        border-radius: 6px;
+        padding: 1rem;
+        margin: 1rem 0;
+        color: #2c5aa0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cancel-container">
+    <div class="cancel-icon">❌</div>
+    <h1 class="cancel-title">Payment Cancelled</h1>
+    
+    <div class="cancel-message">
+        <p>Your payment was cancelled and no charges were made to your account.</p>
+        <p>Your booking was not completed.</p>
+    </div>
+    
+    <div class="info-box">
+        <strong>Need help?</strong> If you experienced any issues during the payment process, 
+        please contact us and we'll be happy to assist you with your booking.
+    </div>
+    
+    <div class="action-buttons">
+        {% if event_id %}
+        <a href="/event/{{ event_id }}/book" class="btn btn-primary">Try Booking Again</a>
+        <a href="/event/{{ event_id }}" class="btn btn-secondary">Back to Event</a>
+        {% else %}
+        <a href="/events" class="btn btn-primary">Browse Events</a>
+        <a href="/" class="btn btn-secondary">Back to Home</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

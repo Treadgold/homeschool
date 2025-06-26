@@ -1,82 +1,708 @@
 {% extends "base.html" %}
 {% block title %}Book Event – {{ event.title }}{% endblock %}
-{% block extra_head %}{% endblock %}
-{% block content %}
-    <div class="container">
-        <h2>Book Event: {{ event.title }}</h2>
-        <div class="event-summary">
-            <strong>Date:</strong> {{ event.date.strftime('%Y-%m-%d %H:%M') }}<br>
-            <strong>Location:</strong> {{ event.location }}<br>
-            <strong>Type:</strong> {{ event.event_type|capitalize }}<br>
-            {% if event.recommended_age %}<strong>Recommended Age:</strong> {{ event.recommended_age }}+<br>{% endif %}
-            {% if event.is_multi_part %}<strong>Multi-part Workshop (Part {{ event.part_number }})</strong><br>{% endif %}
-            {% if event.cost %}<strong>Cost:</strong> ${{ '%.2f' % event.cost }}<br>{% endif %}
-        </div>
-        {% if success %}<div class="success">{{ success }}</div>{% endif %}
-        {% if error %}<div class="error">{{ error }}</div>{% endif %}
-        {% if success and event.recommended_age %}
-            <div class="event-summary" style="background:#fffbe6; color:#b7791f; margin-bottom:1.2rem;">
-                {% set below_age = [] %}
-                {% for child in children %}
-                    {% if child.age < event.recommended_age %}
-                        {% set _ = below_age.append(child.name) %}
-                    {% endif %}
-                {% endfor %}
-                {% if below_age %}
-                    <strong>Note:</strong> The following children are below the recommended age ({{ event.recommended_age }}). Adult assistance must accompany them: {{ below_age|join(', ') }}
-                {% endif %}
-            </div>
-        {% endif %}
-        <form method="post">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <div class="child-list">
-                <strong class="text-muted">Select your saved children to book:</strong><br>
-                {% if children %}
-                    {% for child in children %}
-                        <div class="child-checkbox">
-                            <input type="checkbox" name="child_ids" value="{{ child.id }}" id="child-{{ child.id }}">
-                            <label for="child-{{ child.id }}">
-                                <strong>{{ child.name }}</strong> (Age: {{ child.age }})
-                                {% if child.allergies %}<br><small class="text-muted">Allergies: {{ child.allergies }}</small>{% endif %}
-                                {% if child.needs_assisting_adult %}<br><small class="text-muted">Needs assisting adult</small>{% endif %}
-                            </label>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                    <p class="text-muted">No saved children found. <a href="/children" style="color: #2b6cb0;">Add your children here</a> to save time on future bookings.</p>
-                {% endif %}
-            </div>
-            <div class="add-child-section">
-                <strong class="text-muted">Add a new child (will be saved for future bookings):</strong>
-                <div id="new-children"></div>
-                <button type="button" class="add-child-btn" onclick="addChildForm()">Add Another Child</button>
-            </div>
-            <button type="submit">Book Selected Children</button>
-        </form>
-    </div>
-    <script>
-    let childFormCount = 0;
-    function addChildForm() {
-        const container = document.getElementById('new-children');
-        const idx = childFormCount++;
-        const div = document.createElement('div');
-        div.className = 'child-form';
-        div.innerHTML = `
-            <label>Name
-                <input type="text" name="new_child_names" required>
-            </label>
-            <label>Age
-                <input type="number" name="new_child_ages" min="0" required>
-            </label>
-            <label>Allergies
-                <input type="text" name="new_child_allergies">
-            </label>
-            <label>Notes
-                <textarea name="new_child_notes"></textarea>
-            </label>
-            <button type="button" class="remove-child-btn" onclick="this.parentElement.remove()">Remove</button>
-        `;
-        container.appendChild(div);
+{% block extra_head %}
+<style>
+.booking-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.booking-header {
+    background: linear-gradient(135deg, #2b6cb0 0%, #3182ce 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.booking-header h1 {
+    margin: 0 0 0.5rem 0;
+    font-size: 2rem;
+    font-weight: 600;
+}
+
+.booking-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 1.1rem;
+}
+
+.event-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid #e9ecef;
+    margin-bottom: 2rem;
+}
+
+.event-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.event-detail {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.event-detail-icon {
+    font-size: 1.2rem;
+    color: #2b6cb0;
+}
+
+.event-description {
+    color: #495057;
+    line-height: 1.6;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.booking-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+}
+
+.step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e9ecef;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    transition: all 0.3s;
+}
+
+.step.active .step-number {
+    background: #2b6cb0;
+    color: white;
+}
+
+.step.completed .step-number {
+    background: #28a745;
+    color: white;
+}
+
+.step-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    text-align: center;
+    font-weight: 500;
+}
+
+.step.active .step-label {
+    color: #2b6cb0;
+}
+
+.step.completed .step-label {
+    color: #28a745;
+}
+
+.step-connector {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: #e9ecef;
+    z-index: -1;
+}
+
+.step-connector.active {
+    background: #2b6cb0;
+}
+
+.booking-step {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid #e9ecef;
+    margin-bottom: 1rem;
+}
+
+.step-content {
+    display: none;
+}
+
+.step-content.active {
+    display: block;
+}
+
+.child-selection {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.child-option {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: white;
+}
+
+.child-option:hover {
+    border-color: #2b6cb0;
+    background: #f8f9fa;
+}
+
+.child-option.selected {
+    border-color: #2b6cb0;
+    background: #e8f4fd;
+}
+
+.child-option input[type="checkbox"] {
+    display: none;
+}
+
+.child-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.child-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #2b6cb0;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.child-details h4 {
+    margin: 0 0 0.3rem 0;
+    color: #333;
+}
+
+.child-details p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.child-special-needs {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: #fff3cd;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: #856404;
+}
+
+.age-warning {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 0.8rem;
+    border-radius: 6px;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    border: 1px solid #f5c6cb;
+}
+
+.add-child-section {
+    background: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    margin-top: 1rem;
+}
+
+.add-child-btn {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 0.7rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.add-child-btn:hover {
+    background: #218838;
+}
+
+.child-form {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 0.3rem;
+    font-size: 0.9rem;
+}
+
+.form-group input,
+.form-group textarea {
+    padding: 0.7rem;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 1rem;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.remove-child-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.remove-child-btn:hover {
+    background: #c82333;
+}
+
+.booking-summary {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.summary-item:last-child {
+    border-bottom: none;
+}
+
+.summary-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.summary-value {
+    color: #333;
+}
+
+.total-cost {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #2b6cb0;
+    border-top: 2px solid #2b6cb0;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.step-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+}
+
+.btn-primary {
+    background: #2b6cb0;
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.btn-primary:hover {
+    background: #224e7a;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.btn-success:hover {
+    background: #218838;
+}
+
+@media (max-width: 768px) {
+    .event-details {
+        grid-template-columns: 1fr;
     }
-    </script>
+    
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .step-actions {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .step-actions button {
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="booking-container">
+    <!-- Booking Header -->
+    <div class="booking-header">
+        <h1>Book Your Spot</h1>
+        <p>Join us for an exciting learning experience!</p>
+    </div>
+
+    <!-- Event Details Card -->
+    <div class="event-card">
+        <h2 style="margin: 0 0 1rem 0; color: #2b6cb0;">{{ event.title }}</h2>
+        
+        <div class="event-details">
+            <div class="event-detail">
+                <span class="event-detail-icon">📅</span>
+                <span>{{ event.date.strftime('%B %d, %Y at %I:%M %p') }}</span>
+            </div>
+            <div class="event-detail">
+                <span class="event-detail-icon">📍</span>
+                <span>{{ event.location }}</span>
+            </div>
+            <div class="event-detail">
+                <span class="event-detail-icon">🎯</span>
+                <span>{{ event.event_type|capitalize }} Event</span>
+            </div>
+            {% if event.cost %}
+            <div class="event-detail">
+                <span class="event-detail-icon">💰</span>
+                <span>${{ '%.2f' % event.cost }} per child</span>
+            </div>
+            {% endif %}
+            {% if event.recommended_age %}
+            <div class="event-detail">
+                <span class="event-detail-icon">👶</span>
+                <span>Recommended age: {{ event.recommended_age }}+</span>
+            </div>
+            {% endif %}
+            {% if event.max_pupils %}
+            <div class="event-detail">
+                <span class="event-detail-icon">👥</span>
+                <span>Max capacity: {{ event.max_pupils }} children</span>
+            </div>
+            {% endif %}
+        </div>
+        
+        {% if event.description %}
+        <div class="event-description">
+            {{ event.description }}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Success/Error Messages -->
+    {% if success %}<div class="success">{{ success }}</div>{% endif %}
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+    <!-- Booking Steps -->
+    <div class="booking-steps">
+        <div class="step-connector active"></div>
+        <div class="step active" id="step-1">
+            <div class="step-number">1</div>
+            <div class="step-label">Select Children</div>
+        </div>
+        <div class="step" id="step-2">
+            <div class="step-number">2</div>
+            <div class="step-label">Review & Confirm</div>
+        </div>
+    </div>
+
+    <!-- Step Content -->
+    <div class="booking-step">
+        <!-- Step 1: Select Children -->
+        <div class="step-content active" id="step-content-1">
+            <h3 style="margin: 0 0 1.5rem 0; color: #2b6cb0;">Select Children to Book</h3>
+            
+            <form method="post" id="booking-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                
+                <!-- Existing Children -->
+                {% if children %}
+                <div class="child-selection">
+                    {% for child in children %}
+                    <div class="child-option" onclick="toggleChildSelection(this, {{ child.id }})">
+                        <input type="checkbox" name="child_ids" value="{{ child.id }}" id="child-{{ child.id }}">
+                        <div class="child-info">
+                            <div class="child-avatar">{{ child.name[0]|upper }}</div>
+                            <div class="child-details">
+                                <h4>{{ child.name }} (Age: {{ child.age }})</h4>
+                                <p>
+                                    {% if child.allergies %}Allergies: {{ child.allergies }} • {% endif %}
+                                    {% if child.needs_assisting_adult %}Needs adult assistance{% endif %}
+                                </p>
+                                {% if child.notes %}<p style="font-style: italic; color: #6c757d;">{{ child.notes }}</p>{% endif %}
+                            </div>
+                        </div>
+                        {% if event.recommended_age and child.age < event.recommended_age %}
+                        <div class="age-warning">
+                            ⚠️ Below recommended age ({{ event.recommended_age }}+). Adult assistance required.
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div style="text-align: center; padding: 2rem; color: #6c757d;">
+                    <p>No saved children found. Add your children below or <a href="/children" style="color: #2b6cb0;">manage them here</a>.</p>
+                </div>
+                {% endif %}
+
+                <!-- Add New Children -->
+                <div class="add-child-section">
+                    <h4 style="margin: 0 0 1rem 0; color: #495057;">Add New Children</h4>
+                    <p style="margin: 0 0 1rem 0; color: #6c757d;">New children will be saved to your profile for future bookings.</p>
+                    <button type="button" class="add-child-btn" onclick="addChildForm()">
+                        <span>👶</span> Add Child
+                    </button>
+                </div>
+                
+                <div id="new-children"></div>
+
+                <div class="step-actions">
+                    <a href="/event/{{ event.id }}" class="btn-secondary">← Back to Event</a>
+                    <button type="button" class="btn-primary" onclick="nextStep()">Continue to Review →</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Step 2: Review & Confirm -->
+        <div class="step-content" id="step-content-2">
+            <h3 style="margin: 0 0 1.5rem 0; color: #2b6cb0;">Review Your Booking</h3>
+            
+            <div class="booking-summary">
+                <h4 style="margin: 0 0 1rem 0; color: #495057;">Booking Summary</h4>
+                
+                <div class="summary-item">
+                    <span class="summary-label">Event:</span>
+                    <span class="summary-value">{{ event.title }}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Date & Time:</span>
+                    <span class="summary-value">{{ event.date.strftime('%B %d, %Y at %I:%M %p') }}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Location:</span>
+                    <span class="summary-value">{{ event.location }}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Children:</span>
+                    <span class="summary-value" id="selected-children-count">0 selected</span>
+                </div>
+                {% if event.cost %}
+                <div class="summary-item total-cost">
+                    <span class="summary-label">Total Cost:</span>
+                    <span class="summary-value" id="total-cost">$0.00</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="step-actions">
+                <button type="button" class="btn-secondary" onclick="prevStep()">← Back to Selection</button>
+                <button type="submit" form="booking-form" class="btn-success">✅ Confirm Booking</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let childFormCount = 0;
+let currentStep = 1;
+{% if event.cost %}
+let eventCost = {{ event.cost }};
+{% else %}
+let eventCost = 0;
+{% endif %}
+
+function toggleChildSelection(element, childId) {
+    const checkbox = document.getElementById('child-' + childId);
+    checkbox.checked = !checkbox.checked;
+    
+    if (checkbox.checked) {
+        element.classList.add('selected');
+    } else {
+        element.classList.remove('selected');
+    }
+    
+    updateSummary();
+}
+
+function addChildForm() {
+    const container = document.getElementById('new-children');
+    const idx = childFormCount++;
+    const div = document.createElement('div');
+    div.className = 'child-form';
+    div.innerHTML = `
+        <h4 style="margin: 0 0 1rem 0; color: #495057;">New Child ${idx + 1}</h4>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Name *</label>
+                <input type="text" name="new_child_names" required>
+            </div>
+            <div class="form-group">
+                <label>Age *</label>
+                <input type="number" name="new_child_ages" min="0" max="18" required>
+            </div>
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Allergies (if any)</label>
+                <input type="text" name="new_child_allergies" placeholder="e.g., nuts, dairy">
+            </div>
+            <div class="form-group">
+                <label>Special Needs</label>
+                <input type="text" name="new_child_notes" placeholder="Any special requirements">
+            </div>
+        </div>
+        <button type="button" class="remove-child-btn" onclick="this.parentElement.remove()">Remove Child</button>
+    `;
+    container.appendChild(div);
+}
+
+function nextStep() {
+    const selectedChildren = document.querySelectorAll('input[name="child_ids"]:checked').length;
+    const newChildren = document.querySelectorAll('input[name="new_child_names"]').length;
+    
+    if (selectedChildren === 0 && newChildren === 0) {
+        alert('Please select at least one child or add a new child to continue.');
+        return;
+    }
+    
+    currentStep = 2;
+    updateStepDisplay();
+    updateSummary();
+}
+
+function prevStep() {
+    currentStep = 1;
+    updateStepDisplay();
+}
+
+function updateStepDisplay() {
+    // Update step indicators
+    document.querySelectorAll('.step').forEach((step, index) => {
+        step.classList.remove('active', 'completed');
+        if (index + 1 < currentStep) {
+            step.classList.add('completed');
+        } else if (index + 1 === currentStep) {
+            step.classList.add('active');
+        }
+    });
+    
+    // Update step content
+    document.querySelectorAll('.step-content').forEach((content, index) => {
+        content.classList.remove('active');
+        if (index + 1 === currentStep) {
+            content.classList.add('active');
+        }
+    });
+    
+    // Update connector
+    const connector = document.querySelector('.step-connector');
+    if (currentStep > 1) {
+        connector.classList.add('active');
+    } else {
+        connector.classList.remove('active');
+    }
+}
+
+function updateSummary() {
+    const selectedChildren = document.querySelectorAll('input[name="child_ids"]:checked').length;
+    const newChildren = document.querySelectorAll('input[name="new_child_names"]').length;
+    const totalChildren = selectedChildren + newChildren;
+    
+    document.getElementById('selected-children-count').textContent = totalChildren + ' child' + (totalChildren !== 1 ? 'ren' : '');
+    
+    if (eventCost > 0) {
+        const totalCost = totalChildren * eventCost;
+        document.getElementById('total-cost').textContent = '$' + totalCost.toFixed(2);
+    }
+}
+
+// Initialize summary on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateSummary();
+});
+</script>
 {% endblock %} 

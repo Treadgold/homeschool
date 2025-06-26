@@ -29,10 +29,18 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True)  # Make nullable for OAuth users
     is_admin = Column(Boolean, default=False)
     email_confirmed = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # OAuth fields
+    facebook_id = Column(String(50), unique=True, nullable=True, index=True)
+    first_name = Column(String(100), nullable=True)
+    last_name = Column(String(100), nullable=True)
+    profile_picture_url = Column(String(500), nullable=True)
+    auth_provider = Column(String(20), default='email')  # 'email', 'facebook'
+    
     children = relationship("Child", back_populates="user")
 
 class Child(Base):

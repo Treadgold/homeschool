@@ -1,0 +1,477 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Bookings - {{ event.title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .bookings-container {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+    
+    .event-header {
+        background: linear-gradient(135deg, #2b6cb0 0%, #3182ce 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+    
+    .event-header h1 {
+        margin: 0 0 0.5rem 0;
+        font-size: 2rem;
+        font-weight: 600;
+    }
+    
+    .event-header p {
+        margin: 0;
+        opacity: 0.9;
+        font-size: 1.1rem;
+    }
+    
+    .event-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+    }
+    
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .meta-icon {
+        font-size: 1.1rem;
+    }
+    
+    .capacity-info {
+        background: #e8f4fd;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+        border-left: 4px solid #2b6cb0;
+    }
+    
+    .capacity-bar {
+        width: 100%;
+        height: 12px;
+        background: #dee2e6;
+        border-radius: 6px;
+        margin: 0.5rem 0;
+        overflow: hidden;
+    }
+    
+    .capacity-fill {
+        height: 100%;
+        background: #28a745;
+        transition: width 0.3s;
+    }
+    
+    .capacity-fill.warning {
+        background: #ffc107;
+    }
+    
+    .capacity-fill.danger {
+        background: #dc3545;
+    }
+    
+    .bookings-section {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+    }
+    
+    .bookings-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .bookings-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #2b6cb0;
+        margin: 0;
+    }
+    
+    .booking-count {
+        background: #e8f4fd;
+        color: #2b6cb0;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 500;
+    }
+    
+    .bookings-grid {
+        display: grid;
+        gap: 1.5rem;
+    }
+    
+    .booking-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.5rem;
+        border: 1px solid #e9ecef;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .booking-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .booking-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+    
+    .child-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .child-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: #2b6cb0;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+    
+    .child-details h3 {
+        margin: 0 0 0.3rem 0;
+        color: #333;
+        font-size: 1.2rem;
+    }
+    
+    .child-details p {
+        margin: 0;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    .parent-info {
+        text-align: right;
+    }
+    
+    .parent-email {
+        color: #2b6cb0;
+        font-size: 0.9rem;
+        text-decoration: none;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+    
+    .parent-email:hover {
+        text-decoration: underline;
+    }
+    
+    .booking-date {
+        color: #6c757d;
+        font-size: 0.8rem;
+    }
+    
+    .booking-meta {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e9ecef;
+    }
+    
+    .meta-tag {
+        background: #e9ecef;
+        padding: 0.3rem 0.6rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        color: #495057;
+    }
+    
+    .meta-tag.warning {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .meta-tag.danger {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .meta-tag.success {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .booking-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.2s;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+    
+    .btn-primary {
+        background: #2b6cb0;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #224e7a;
+    }
+    
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-danger:hover {
+        background: #c82333;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background: #545b62;
+    }
+    
+    .no-bookings {
+        text-align: center;
+        padding: 3rem;
+        color: #6c757d;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border: 2px dashed #dee2e6;
+    }
+    
+    .navigation-actions {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+    }
+    
+    .export-section {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+        border: 1px solid #e9ecef;
+    }
+    
+    .export-title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #495057;
+        margin: 0 0 1rem 0;
+    }
+    
+    .export-actions {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    
+    @media (max-width: 768px) {
+        .event-meta {
+            grid-template-columns: 1fr;
+        }
+        
+        .booking-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        
+        .parent-info {
+            text-align: left;
+        }
+        
+        .navigation-actions {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bookings-container">
+    <!-- Navigation -->
+    <div class="navigation-actions">
+        <a href="/admin/events/all" class="btn btn-secondary">← Back to All Events</a>
+        <a href="/admin/events/calendar" class="btn btn-secondary">📅 Calendar View</a>
+        <a href="/admin" class="btn btn-secondary">🏠 Dashboard</a>
+    </div>
+
+    <!-- Event Header -->
+    <div class="event-header">
+        <h1>{{ event.title }}</h1>
+        <p>Manage Bookings and Participants</p>
+        
+        <div class="event-meta">
+            <div class="meta-item">
+                <span class="meta-icon">📅</span>
+                <span>{{ event.date.strftime('%B %d, %Y at %I:%M %p') }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-icon">📍</span>
+                <span>{{ event.location or 'Location TBD' }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-icon">🎯</span>
+                <span>{{ event.event_type|capitalize }} Event</span>
+            </div>
+            {% if event.cost %}
+            <div class="meta-item">
+                <span class="meta-icon">💰</span>
+                <span>${{ '%.2f' % event.cost }} per child</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Capacity Info -->
+    {% if event.max_pupils %}
+    <div class="capacity-info">
+        <h3 style="margin: 0 0 0.5rem 0; color: #2b6cb0;">Capacity Overview</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <span><strong>{{ event.bookings|length }} / {{ event.max_pupils }} children booked</strong></span>
+            <span><strong>{{ '%.0f' % (event.bookings|length / event.max_pupils * 100) }}% full</strong></span>
+        </div>
+        <div class="capacity-bar">
+            {% set capacity_percent = (event.bookings|length / event.max_pupils * 100) %}
+            <div class="capacity-fill {% if capacity_percent >= 90 %}danger{% elif capacity_percent >= 75 %}warning{% endif %}" 
+                 style="width: {{ capacity_percent }}%"></div>
+        </div>
+        <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; color: #6c757d;">
+            {% if capacity_percent >= 100 %}
+                ⚠️ Event is at full capacity
+            {% elif capacity_percent >= 90 %}
+                ⚠️ Event is nearly full
+            {% elif capacity_percent >= 75 %}
+                📈 Event is filling up
+            {% else %}
+                ✅ Plenty of spots available
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+
+    <!-- Export Section -->
+    <div class="export-section">
+        <h3 class="export-title">📊 Export & Reports</h3>
+        <div class="export-actions">
+            <a href="/admin/events/{{ event.id }}/export-bookings" class="btn btn-primary">📄 Export Bookings CSV</a>
+            <a href="/admin/events/{{ event.id }}/export-participants" class="btn btn-primary">👥 Export Participants List</a>
+            <a href="mailto:?subject=Event Details - {{ event.title }}&body=Event: {{ event.title }}%0D%0ADate: {{ event.date.strftime('%B %d, %Y at %I:%M %p') }}%0D%0ALocation: {{ event.location or 'TBD' }}%0D%0ABookings: {{ event.bookings|length }}{% if event.max_pupils %}/{{ event.max_pupils }}{% endif %}" class="btn btn-secondary">📧 Email Event Summary</a>
+        </div>
+    </div>
+
+    <!-- Bookings Section -->
+    <div class="bookings-section">
+        <div class="bookings-header">
+            <h2 class="bookings-title">👥 Participants ({{ event.bookings|length }})</h2>
+            <span class="booking-count">{{ event.bookings|length }} children registered</span>
+        </div>
+
+        {% if event.bookings %}
+        <div class="bookings-grid">
+            {% for booking in event.bookings %}
+            <div class="booking-card">
+                <div class="booking-header">
+                    <div class="child-info">
+                        <div class="child-avatar">{{ booking.child.name[0]|upper }}</div>
+                        <div class="child-details">
+                            <h3>{{ booking.child.name }}</h3>
+                            <p>Age: {{ booking.child.age }} • {{ booking.child.user.email }}</p>
+                            <p class="booking-date">Booked: {{ booking.timestamp.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                        </div>
+                    </div>
+                    <div class="parent-info">
+                        <a href="mailto:{{ booking.child.user.email }}" class="parent-email">
+                            📧 Contact Parent
+                        </a>
+                        <div class="booking-date">
+                            Parent: {{ booking.child.user.email }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="booking-meta">
+                    {% if booking.child.allergies %}
+                    <span class="meta-tag warning">⚠️ Allergies: {{ booking.child.allergies }}</span>
+                    {% endif %}
+                    {% if booking.child.needs_assisting_adult %}
+                    <span class="meta-tag warning">👨‍👩‍👧‍👦 Needs Adult</span>
+                    {% endif %}
+                    {% if booking.child.notes %}
+                    <span class="meta-tag">📝 {{ booking.child.notes }}</span>
+                    {% endif %}
+                    {% if event.recommended_age and booking.child.age < event.recommended_age %}
+                    <span class="meta-tag warning">⚠️ Below recommended age</span>
+                    {% endif %}
+                    {% if booking.volunteer %}
+                    <span class="meta-tag success">🤝 Volunteer</span>
+                    {% endif %}
+                    {% if booking.payment_status == 'paid' %}
+                    <span class="meta-tag success">✅ Paid</span>
+                    {% elif booking.payment_status == 'unpaid' %}
+                    <span class="meta-tag danger">❌ Unpaid</span>
+                    {% endif %}
+                </div>
+                
+                <div class="booking-actions">
+                    <a href="mailto:{{ booking.child.user.email }}?subject=Regarding {{ event.title }}&body=Hi,%0D%0A%0D%0AI'm contacting you regarding your child {{ booking.child.name }}'s booking for {{ event.title }}.%0D%0A%0D%0AEvent Details:%0D%0A- Date: {{ event.date.strftime('%B %d, %Y at %I:%M %p') }}%0D%0A- Location: {{ event.location or 'TBD' }}%0D%0A%0D%0APlease let me know if you have any questions.%0D%0A%0D%0ABest regards," class="btn btn-primary">📧 Send Email</a>
+                    <form method="POST" action="/admin/bookings/{{ booking.id }}/cancel" style="display: inline;" onsubmit="return confirm('Are you sure you want to cancel this booking? This action cannot be undone.')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="btn btn-danger">❌ Cancel Booking</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-bookings">
+            <h3>No bookings yet</h3>
+            <p>This event hasn't received any bookings.</p>
+            <a href="/event/{{ event.id }}" class="btn btn-primary">View Public Event Page</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

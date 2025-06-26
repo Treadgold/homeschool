@@ -11,3 +11,6 @@ passlib>=1.7.4
 itsdangerous
 slowapi
 bcrypt>=4.1.2
+authlib
+requests
+httpx

@@ -1,30 +1,419 @@
 {% extends "base.html" %}
-{% block title %}User Profile – LifeLearners.org.nz{% endblock %}
-{% block extra_head %}{% endblock %}
+{% block title %}Dashboard – LifeLearners.org.nz{% endblock %}
+{% block extra_head %}
+<style>
+.dashboard-container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.dashboard-header {
+    background: linear-gradient(135deg, #2b6cb0 0%, #3182ce 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.dashboard-header h1 {
+    margin: 0 0 0.5rem 0;
+    font-size: 2.2rem;
+    font-weight: 600;
+}
+
+.dashboard-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 1.1rem;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.dashboard-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid #e9ecef;
+}
+
+.dashboard-card h3 {
+    margin: 0 0 1rem 0;
+    color: #2b6cb0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dashboard-card h3::before {
+    content: "📊";
+    font-size: 1.2rem;
+}
+
+.dashboard-card h3.profile-icon::before {
+    content: "👤";
+}
+
+.dashboard-card h3.bookings-icon::before {
+    content: "📅";
+}
+
+.dashboard-card h3.children-icon::before {
+    content: "👶";
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #2b6cb0;
+    display: block;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin-top: 0.3rem;
+}
+
+.form-section {
+    margin-bottom: 1.5rem;
+}
+
+.form-section h4 {
+    margin: 0 0 0.8rem 0;
+    color: #495057;
+    font-size: 1.1rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.form-row.full-width {
+    grid-template-columns: 1fr;
+}
+
+.btn-primary {
+    background: #2b6cb0;
+    color: white;
+    border: none;
+    padding: 0.7rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.btn-primary:hover {
+    background: #224e7a;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 0.7rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.booking-group {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e9ecef;
+}
+
+.booking-child-name {
+    font-weight: 600;
+    color: #2b6cb0;
+    margin-bottom: 0.8rem;
+    font-size: 1.1rem;
+}
+
+.booking-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.booking-list li {
+    background: white;
+    padding: 0.8rem;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    border: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.booking-info {
+    flex: 1;
+}
+
+.booking-title {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 0.2rem;
+}
+
+.booking-meta {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.booking-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-cancel {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.btn-cancel:hover {
+    background: #c82333;
+}
+
+.btn-view {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.btn-view:hover {
+    background: #218838;
+}
+
+.no-bookings {
+    text-align: center;
+    color: #6c757d;
+    padding: 2rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 2px dashed #dee2e6;
+}
+
+.no-bookings h4 {
+    margin: 0 0 0.5rem 0;
+    color: #495057;
+}
+
+.quick-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.quick-action-btn {
+    background: #e9ecef;
+    color: #495057;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.quick-action-btn:hover {
+    background: #2b6cb0;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .booking-list li {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .booking-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
-    <div class="container">
-        <h2>User Profile</h2>
-        {% if success %}<div class="success">{{ success }}</div>{% endif %}
-        {% if error %}<div class="error">{{ error }}</div>{% endif %}
-        <form method="post">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <label>Email
-                <input type="email" name="email" value="{{ user.email }}" required autocomplete="username">
-            </label>
-            <button type="submit">Update Email</button>
-        </form>
-        <form method="post" style="margin-top:1.5rem;">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <label>New Password
-                <input type="password" name="password" autocomplete="new-password">
-            </label>
-            <label>Confirm Password
-                <input type="password" name="password_confirm" autocomplete="new-password">
-            </label>
-            <button type="submit">Update Password</button>
-        </form>
-        <hr style="margin:2.2rem 0;">
-        <h2 style="text-align:center; color:#2b6cb0;">Your Bookings</h2>
+<div class="dashboard-container">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <h1>Welcome back{% if user.first_name %}, {{ user.first_name }}{% endif %}!</h1>
+        <p>Manage your profile, view bookings, and stay updated with your homeschool community</p>
+    </div>
+
+    <!-- Success/Error Messages -->
+    {% if success %}<div class="success">{{ success }}</div>{% endif %}
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+    <!-- Dashboard Grid -->
+    <div class="dashboard-grid">
+        <!-- Profile Information -->
+        <div class="dashboard-card">
+            <h3 class="profile-icon">Profile Information</h3>
+            
+            <!-- Display Facebook Profile Info if available -->
+            {% if user.auth_provider in ['facebook', 'both'] and user.first_name %}
+            <div style="background: #e8f4fd; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+                {% if user.profile_picture_url %}
+                <img src="{{ user.profile_picture_url }}" alt="Profile Picture" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;">
+                {% endif %}
+                <div>
+                    <div style="font-weight: 600; color: #2b6cb0; font-size: 1.1rem;">{{ user.first_name }} {{ user.last_name or '' }}</div>
+                    <div style="color: #6c757d; font-size: 0.9rem;">Connected with Facebook</div>
+                    <div style="color: #6c757d; font-size: 0.9rem;">{{ user.email }}</div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <form method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="form-section">
+                    <h4>Email Address</h4>
+                    <input type="email" name="email" value="{{ user.email }}" required autocomplete="username" style="width: 100%; padding: 0.7rem; border-radius: 6px; border: 1px solid #ced4da;">
+                </div>
+                <button type="submit" class="btn-primary">Update Email</button>
+            </form>
+
+            <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e9ecef;">
+
+            {% if user.auth_provider in ['email', 'both'] %}
+            <form method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="form-section">
+                    <h4>Change Password</h4>
+                    <div class="form-row">
+                        <div>
+                            <label style="font-size: 0.9rem; color: #6c757d;">New Password</label>
+                            <input type="password" name="password" autocomplete="new-password" style="width: 100%; padding: 0.7rem; border-radius: 6px; border: 1px solid #ced4da;">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.9rem; color: #6c757d;">Confirm Password</label>
+                            <input type="password" name="password_confirm" autocomplete="new-password" style="width: 100%; padding: 0.7rem; border-radius: 6px; border: 1px solid #ced4da;">
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary">Update Password</button>
+            </form>
+            {% else %}
+            <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; text-align: center; color: #6c757d;">
+                <p>You signed in with Facebook, so you don't need to manage a password here.</p>
+                <p style="font-size: 0.9rem;">You can change your password directly on Facebook if needed.</p>
+            </div>
+            {% endif %}
+
+            <div class="quick-actions">
+                <a href="/children" class="quick-action-btn">👶 Manage Children</a>
+                <a href="/events" class="quick-action-btn">📅 Browse Events</a>
+                <a href="/gallery" class="quick-action-btn">📸 View Gallery</a>
+            </div>
+        </div>
+
+        <!-- Statistics & Overview -->
+        <div class="dashboard-card">
+            <h3>Your Activity</h3>
+            
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-number">{{ bookings|length if bookings else 0 }}</span>
+                    <span class="stat-label">Total Bookings</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ user.children|length if user.children else 0 }}</span>
+                    <span class="stat-label">Children</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ (bookings|selectattr('event.date', 'ge', now)|list)|length if bookings else 0 }}</span>
+                    <span class="stat-label">Upcoming Events</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ (bookings|selectattr('event.date', 'lt', now)|list)|length if bookings else 0 }}</span>
+                    <span class="stat-label">Past Events</span>
+                </div>
+            </div>
+
+            <div style="background: #e8f4fd; padding: 1rem; border-radius: 8px; border-left: 4px solid #2b6cb0;">
+                <h4 style="margin: 0 0 0.5rem 0; color: #2b6cb0;">Quick Tips</h4>
+                <ul style="margin: 0; padding-left: 1.2rem; color: #495057;">
+                    <li>Add your children to get personalized event recommendations</li>
+                    <li>Check upcoming events regularly for new opportunities</li>
+                    <li>Contact us if you need to modify any bookings</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bookings Section -->
+    <div class="dashboard-card">
+        <h3 class="bookings-icon">Your Bookings</h3>
+        
         {% if bookings and bookings|length > 0 %}
             {% set bookings_by_child = {} %}
             {% for booking in bookings %}
@@ -34,26 +423,40 @@
                 {% endif %}
                 {% set _ = bookings_by_child[child.id]['bookings'].append(booking) %}
             {% endfor %}
+            
             {% for child_id, data in bookings_by_child.items() %}
-                <div class="booking-child-block">
+                <div class="booking-group">
                     <div class="booking-child-name">{{ data.child.name }} (Age: {{ data.child.age }})</div>
                     <ul class="booking-list">
                         {% for booking in data.bookings %}
                             <li>
-                                <strong>{{ booking.event.title }}</strong> &mdash; {{ booking.event.date.strftime('%Y-%m-%d %H:%M') }}
-                                <form method="post" action="/cancel-booking" style="display:inline; margin-left:1.2rem;">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                    <input type="hidden" name="booking_id" value="{{ booking.id }}">
-                                    <button type="submit" class="cancel-btn">Cancel</button>
-                                </form>
+                                <div class="booking-info">
+                                    <div class="booking-title">{{ booking.event.title }}</div>
+                                    <div class="booking-meta">
+                                        {{ booking.event.date.strftime('%B %d, %Y at %I:%M %p') }} | {{ booking.event.location }}
+                                        {% if booking.event.cost %} | ${{ '%.2f' % booking.event.cost }}{% endif %}
+                                    </div>
+                                </div>
+                                <div class="booking-actions">
+                                    <a href="/event/{{ booking.event.id }}" class="btn-view">View Event</a>
+                                    <form method="post" action="/cancel-booking" style="display: inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                        <input type="hidden" name="booking_id" value="{{ booking.id }}">
+                                        <button type="submit" class="btn-cancel" onclick="return confirm('Are you sure you want to cancel this booking?')">Cancel</button>
+                                    </form>
+                                </div>
                             </li>
                         {% endfor %}
                     </ul>
                 </div>
             {% endfor %}
         {% else %}
-            <div style="text-align:center; color:#888; margin:2rem 0;">No bookings found.</div>
+            <div class="no-bookings">
+                <h4>No bookings yet</h4>
+                <p>Start exploring events and book your first activity!</p>
+                <a href="/events" class="btn-primary" style="display: inline-block; margin-top: 1rem;">Browse Events</a>
+            </div>
         {% endif %}
-        <a class="back-link" href="/">&larr; Back to Home</a>
     </div>
+</div>
 {% endblock %} 

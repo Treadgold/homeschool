@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Successful - LifeLearners.org.nz{% endblock %}
+
+{% block extra_head %}
+<style>
+    .success-container {
+        max-width: 600px;
+        margin: 2rem auto;
+        padding: 2rem;
+        text-align: center;
+    }
+    .success-icon {
+        font-size: 4rem;
+        color: #38a169;
+        margin-bottom: 1rem;
+    }
+    .success-title {
+        font-size: 2rem;
+        color: #2d3748;
+        margin-bottom: 1rem;
+    }
+    .success-message {
+        font-size: 1.1rem;
+        color: #4a5568;
+        margin-bottom: 2rem;
+        line-height: 1.6;
+    }
+    .event-details {
+        background: #f7fafc;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 2rem 0;
+        text-align: left;
+    }
+    .event-details h3 {
+        margin: 0 0 1rem 0;
+        color: #2d3748;
+    }
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        padding: 0.25rem 0;
+    }
+    .detail-label {
+        font-weight: 500;
+        color: #4a5568;
+    }
+    .detail-value {
+        color: #2d3748;
+    }
+    .mock-notice {
+        background: #fef5e7;
+        border: 1px solid #f6e05e;
+        border-radius: 6px;
+        padding: 1rem;
+        margin: 1rem 0;
+        color: #744210;
+    }
+    .action-buttons {
+        margin-top: 2rem;
+    }
+    .btn {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        margin: 0.5rem;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: #2b6cb0;
+        color: white;
+    }
+    .btn-primary:hover {
+        background: #2c5aa0;
+    }
+    .btn-secondary {
+        background: #e2e8f0;
+        color: #4a5568;
+    }
+    .btn-secondary:hover {
+        background: #cbd5e0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="success-container">
+    <div class="success-icon">✅</div>
+    <h1 class="success-title">Payment Successful!</h1>
+    
+    {% if mock_mode %}
+    <div class="mock-notice">
+        <strong>Development Mode:</strong> This is a simulated payment confirmation. In production, this would be a real Stripe transaction.
+    </div>
+    {% endif %}
+    
+    <div class="success-message">
+        {% if event %}
+            Your booking for <strong>{{ event.title }}</strong> has been confirmed and payment has been processed successfully.
+        {% else %}
+            Your payment has been processed successfully and your booking has been confirmed.
+        {% endif %}
+    </div>
+    
+    {% if event %}
+    <div class="event-details">
+        <h3>Booking Details</h3>
+        <div class="detail-item">
+            <span class="detail-label">Event:</span>
+            <span class="detail-value">{{ event.title }}</span>
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">Date:</span>
+            <span class="detail-value">{{ event.date.strftime('%B %d, %Y at %I:%M %p') }}</span>
+        </div>
+        {% if event.location %}
+        <div class="detail-item">
+            <span class="detail-label">Location:</span>
+            <span class="detail-value">{{ event.location }}</span>
+        </div>
+        {% endif %}
+        {% if event.cost %}
+        <div class="detail-item">
+            <span class="detail-label">Cost per child:</span>
+            <span class="detail-value">${{ "%.2f"|format(event.cost) }}</span>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <div class="success-message">
+        <p>🎉 A confirmation email has been sent to <strong>{{ user.email }}</strong></p>
+        <p>You can view your bookings and manage your children in your profile.</p>
+    </div>
+    
+    <div class="action-buttons">
+        <a href="/profile" class="btn btn-primary">View My Bookings</a>
+        <a href="/events" class="btn btn-secondary">Browse More Events</a>
+    </div>
+</div>
+{% endblock %} 
