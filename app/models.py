@@ -36,10 +36,11 @@ class User(Base):
     
     # OAuth fields
     facebook_id = Column(String(50), unique=True, nullable=True, index=True)
+    google_id = Column(String(50), unique=True, nullable=True, index=True)
     first_name = Column(String(100), nullable=True)
     last_name = Column(String(100), nullable=True)
     profile_picture_url = Column(String(500), nullable=True)
-    auth_provider = Column(String(20), default='email')  # 'email', 'facebook'
+    auth_provider = Column(String(20), default='email')  # 'email', 'facebook', 'google'
     
     children = relationship("Child", back_populates="user")
 

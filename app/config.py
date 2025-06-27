@@ -27,6 +27,11 @@ class Config:
     FACEBOOK_CLIENT_SECRET: str = os.getenv("FACEBOOK_CLIENT_SECRET", "")
     FACEBOOK_REDIRECT_URI: str = f"{SITE_URL}/auth/facebook/callback"
     
+    # Google OAuth Configuration
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    GOOGLE_REDIRECT_URI: str = f"{SITE_URL}/auth/google/callback"
+    
     # Stripe Configuration
     STRIPE_PUBLISHABLE_KEY: str = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
     STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "")
@@ -53,5 +58,9 @@ class Config:
     @property
     def facebook_oauth_enabled(self) -> bool:
         return bool(self.FACEBOOK_CLIENT_ID and self.FACEBOOK_CLIENT_SECRET)
+    
+    @property
+    def google_oauth_enabled(self) -> bool:
+        return bool(self.GOOGLE_CLIENT_ID and self.GOOGLE_CLIENT_SECRET)
 
 config = Config() 

@@ -50,6 +50,19 @@ if config.facebook_oauth_enabled:
         },
     )
 
+if config.google_oauth_enabled:
+    oauth.register(
+        name='google',
+        client_id=config.GOOGLE_CLIENT_ID,
+        client_secret=config.GOOGLE_CLIENT_SECRET,
+        authorize_url='https://accounts.google.com/o/oauth2/v2/auth',
+        access_token_url='https://oauth2.googleapis.com/token',
+        jwks_uri='https://www.googleapis.com/oauth2/v3/certs',
+        client_kwargs={
+            'scope': 'openid email profile'
+        },
+    )
+
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -193,6 +206,8 @@ async def signup(request: Request, db: Session = Depends(get_db), email: str = F
         csrf_token = generate_csrf_token()
         if existing_user.auth_provider == 'facebook':
             return templates.TemplateResponse("signup.html", {"request": request, "error": "This email is already registered with Facebook. Please use 'Continue with Facebook' to log in.", "csrf_token": csrf_token})
+        elif existing_user.auth_provider == 'google':
+            return templates.TemplateResponse("signup.html", {"request": request, "error": "This email is already registered with Google. Please use 'Continue with Google' to log in.", "csrf_token": csrf_token})
         else:
             return templates.TemplateResponse("signup.html", {"request": request, "error": "Email already registered.", "csrf_token": csrf_token})
     
@@ -282,12 +297,21 @@ async def login(request: Request, db: Session = Depends(get_db), email: str = Fo
         csrf_token = generate_csrf_token()
         return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials.", "csrf_token": csrf_token})
     
-    # Check if this is a Facebook-only user
+        # Check if this is a Facebook-only user
     if user.auth_provider == 'facebook' and not user.hashed_password:
         csrf_token = generate_csrf_token()
         return templates.TemplateResponse("login.html", {
-            "request": request, 
+            "request": request,
             "error": "This account was created with Facebook. Please use 'Continue with Facebook' to log in.",
+            "csrf_token": csrf_token
+        })
+    
+    # Check if this is a Google-only user
+    if user.auth_provider == 'google' and not user.hashed_password:
+        csrf_token = generate_csrf_token()
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "This account was created with Google. Please use 'Continue with Google' to log in.",
             "csrf_token": csrf_token
         })
     
@@ -326,17 +350,24 @@ async def health_check(db: Session = Depends(get_db)):
     except Exception as e:
         database_status = f"error: {e}"
     
-    # Test Facebook OAuth configuration
+    # Test OAuth configurations
     facebook_config = {
         "enabled": config.facebook_oauth_enabled,
         "client_id": config.FACEBOOK_CLIENT_ID[:10] + "..." if config.FACEBOOK_CLIENT_ID else None,
         "has_secret": bool(config.FACEBOOK_CLIENT_SECRET)
     }
     
+    google_config = {
+        "enabled": config.google_oauth_enabled,
+        "client_id": config.GOOGLE_CLIENT_ID[:10] + "..." if config.GOOGLE_CLIENT_ID else None,
+        "has_secret": bool(config.GOOGLE_CLIENT_SECRET)
+    }
+    
     return {
         "status": "ok",
         "database": database_status,
-        "facebook_oauth": facebook_config
+        "facebook_oauth": facebook_config,
+        "google_oauth": google_config
     }
 
 @app.get("/debug/session")
@@ -525,6 +556,153 @@ async def facebook_callback(request: Request, db: Session = Depends(get_db)):
             "csrf_token": generate_csrf_token()
         })
 
+# Google OAuth Routes
+@app.get("/auth/google")
+async def google_login(request: Request):
+    print("Initiating Google login process")
+    if not config.google_oauth_enabled:
+        print("Google OAuth is not enabled")
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Google login is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.",
+            "csrf_token": generate_csrf_token()
+        })
+    
+    try:
+        google = oauth.create_client('google')
+        redirect_uri = config.GOOGLE_REDIRECT_URI
+        print(f"Redirecting to Google with URI: {redirect_uri}")
+        return await google.authorize_redirect(request, redirect_uri)
+    except Exception as e:
+        print(f"Google OAuth initialization error: {e}")
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Google login is temporarily unavailable. Please try again later or use email login.",
+            "csrf_token": generate_csrf_token()
+        })
+
+@app.get("/auth/google/callback")
+async def google_callback(request: Request, db: Session = Depends(get_db)):
+    print("Received Google OAuth callback")
+    if not config.google_oauth_enabled:
+        print("Google OAuth is not enabled")
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Google login is not configured.",
+            "csrf_token": generate_csrf_token()
+        })
+    
+    try:
+        google = oauth.create_client('google')
+        
+        # Check for OAuth errors in the callback
+        if request.query_params.get('error'):
+            error_description = request.query_params.get('error_description', 'Google login failed')
+            print(f"Google OAuth error from callback: {request.query_params.get('error')}: {error_description}")
+            return templates.TemplateResponse("login.html", {
+                "request": request,
+                "error": "Google login was cancelled or failed. Please try again.",
+                "csrf_token": generate_csrf_token()
+            })
+        
+        token = await google.authorize_access_token(request)
+        print(f"Google OAuth token received successfully: {token}")
+        
+        # Get user info from Google (already parsed in token response)
+        google_user = token.get('userinfo')
+        if not google_user:
+            # Fallback: try to parse ID token manually
+            google_user = await google.parse_id_token(request, token['id_token'])
+        print(f"Google user data received: {google_user}")
+        
+        if not google_user.get('email'):
+            print("Google account does not have a verified email address")
+            return templates.TemplateResponse("login.html", {
+                "request": request,
+                "error": "Google account must have a verified email address.",
+                "csrf_token": generate_csrf_token()
+            })
+        
+        # Check if user exists by Google ID
+        try:
+            user = db.query(User).filter(User.google_id == google_user['sub']).first()
+            print(f"User found by Google ID: {user}")
+        except Exception as e:
+            if "does not exist" in str(e):
+                print("Database schema does not support Google ID, falling back to email lookup")
+                user = None
+            else:
+                raise
+        
+        if not user:
+            # Check if user exists by email (to link accounts)
+            user = db.query(User).filter(User.email == google_user['email']).first()
+            if user:
+                print(f"User found by email: {user}")
+                # Link existing account to Google
+                try:
+                    user.google_id = google_user['sub']
+                    user.first_name = google_user.get('given_name')
+                    user.last_name = google_user.get('family_name')
+                    user.profile_picture_url = google_user.get('picture')
+                    if hasattr(user, 'auth_provider') and user.auth_provider == 'email':
+                        user.auth_provider = 'both'  # User has both email and Google auth
+                    print("Linked existing account to Google")
+                except AttributeError:
+                    print("Warning: Google fields not available in database schema. User logged in with existing account.")
+            else:
+                print("No existing user found, creating new user")
+                # Create new user
+                try:
+                    user = User(
+                        email=google_user['email'],
+                        google_id=google_user['sub'],
+                        first_name=google_user.get('given_name'),
+                        last_name=google_user.get('family_name'),
+                        profile_picture_url=google_user.get('picture'),
+                        auth_provider='google',
+                        email_confirmed=True  # Google emails are considered verified
+                    )
+                    print("New user created with Google fields")
+                except TypeError:
+                    # Schema doesn't have Google fields yet - create basic user
+                    user = User(
+                        email=google_user['email'],
+                        email_confirmed=True  # Google emails are considered verified
+                    )
+                    print("Warning: Created user without Google fields. Please run database migration.")
+                db.add(user)
+        else:
+            print("Updating existing Google user info")
+            # Update existing Google user info
+            try:
+                user.first_name = google_user.get('given_name')
+                user.last_name = google_user.get('family_name')
+                user.profile_picture_url = google_user.get('picture')
+            except AttributeError:
+                print("Warning: Google fields not available for update. Please run database migration.")
+        
+        db.commit()
+        db.refresh(user)
+        print(f"User created/updated successfully: ID={user.id}, Email={user.email}")
+        
+        # Create session token and store it server-side
+        session_token = create_session_cookie(user.id)
+        oauth_session_id = str(uuid.uuid4())
+        oauth_sessions[oauth_session_id] = user.id
+        print(f"Created OAuth session: {oauth_session_id} for user {user.id}")
+        
+        # Redirect to a completion endpoint that will set the final session cookie
+        return RedirectResponse(url=f"/auth/complete?session_id={oauth_session_id}", status_code=HTTP_303_SEE_OTHER)
+        
+    except Exception as e:
+        print(f"Google OAuth error: {e}")
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Google login failed. Please try again.",
+            "csrf_token": generate_csrf_token()
+        })
+
 @app.get("/auth/complete")
 async def auth_complete(request: Request, session_id: str = Query(...)):
     """Complete the OAuth flow by setting the session cookie"""
@@ -547,6 +725,11 @@ async def auth_complete(request: Request, session_id: str = Query(...)):
     # Create the final session cookie
     session_token = create_session_cookie(user_id)
     response = RedirectResponse(url="/", status_code=HTTP_303_SEE_OTHER)
+    
+    # Clear any existing session cookies first
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    
+    # Set the new session cookie
     response.set_cookie(
         SESSION_COOKIE, 
         session_token, 
@@ -645,12 +828,22 @@ def startup_tasks():
     # Check Facebook OAuth configuration with debug info
     print(f"🔍 Debug - Facebook Client ID: {config.FACEBOOK_CLIENT_ID[:10]}..." if config.FACEBOOK_CLIENT_ID else "🔍 Debug - Facebook Client ID: NOT SET")
     print(f"🔍 Debug - Facebook Secret: {'SET' if config.FACEBOOK_CLIENT_SECRET else 'NOT SET'}")
-    print(f"🔍 Debug - OAuth Enabled: {config.facebook_oauth_enabled}")
+    print(f"🔍 Debug - Facebook OAuth Enabled: {config.facebook_oauth_enabled}")
     
     if config.facebook_oauth_enabled:
         print("✅ Facebook OAuth is configured")
     else:
         print("⚠️  Facebook OAuth is not configured (missing FACEBOOK_CLIENT_ID or FACEBOOK_CLIENT_SECRET)")
+    
+    # Check Google OAuth configuration with debug info
+    print(f"🔍 Debug - Google Client ID: {config.GOOGLE_CLIENT_ID[:10]}..." if config.GOOGLE_CLIENT_ID else "🔍 Debug - Google Client ID: NOT SET")
+    print(f"🔍 Debug - Google Secret: {'SET' if config.GOOGLE_CLIENT_SECRET else 'NOT SET'}")
+    print(f"🔍 Debug - Google OAuth Enabled: {config.google_oauth_enabled}")
+    
+    if config.google_oauth_enabled:
+        print("✅ Google OAuth is configured")
+    else:
+        print("⚠️  Google OAuth is not configured (missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET)")
     
     create_test_users()
 
