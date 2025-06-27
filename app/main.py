@@ -16,18 +16,25 @@ import shutil
 import uuid
 from sqlalchemy.exc import IntegrityError
 from starlette.middleware.base import BaseHTTPMiddleware
-from typing import List
+from starlette.middleware.sessions import SessionMiddleware
+from typing import List, Dict
 import smtplib
 from email.mime.text import MIMEText
+import uuid
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from authlib.integrations.starlette_client import OAuth
 import requests
+from sqlalchemy import text
+import logging
 
 app = FastAPI()
 # Use absolute path for templates to ensure correct resolution in Docker and local dev
 templates = Jinja2Templates(directory="app/templates")
+
+# Add session middleware for OAuth
+app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "dev-secret-key"))
 
 # Initialize OAuth
 oauth = OAuth()
@@ -39,42 +46,46 @@ if config.facebook_oauth_enabled:
         authorize_url='https://www.facebook.com/dialog/oauth',
         access_token_url='https://graph.facebook.com/oauth/access_token',
         client_kwargs={
-            'scope': 'email public_profile'
+            'scope': 'public_profile email'  # Changed order - public_profile first
         },
     )
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+
+# User Context Middleware - MUST be added early!
+class UserContextMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        logging.debug(f"UserContextMiddleware: Processing request {request.method} {request.url}")
+        db = SessionLocal()
+        user = None
+        session = request.cookies.get(SESSION_COOKIE)
+        
+        # Log all cookies for debugging
+        all_cookies = dict(request.cookies)
+        logging.debug(f"All cookies received: {all_cookies}")
+        logging.debug(f"Session cookie ({SESSION_COOKIE}): {session[:50] + '...' if session and len(session) > 50 else session}")
+        
+        if session:
+            try:
+                data = serializer.loads(session, max_age=SESSION_MAX_AGE)
+                user = db.query(User).filter(User.id == data["user_id"]).first()
+                logging.debug(f"User successfully loaded from session: ID={user.id}, Email={user.email}" if user else "No user found with session user_id")
+            except Exception as e:
+                logging.error(f"Error loading session: {e}")
+                user = None
+        else:
+            logging.debug("No session cookie found")
+        request.state.user = user
+        response = await call_next(request)
+        db.close()
+        return response
+
+app.add_middleware(UserContextMiddleware)
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
-
-# Custom rate limit exceeded handler for HTML responses
-async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
-    return HTMLResponse(
-        content=f"""
-        <html>
-        <head>
-            <title>Rate Limit Exceeded - LifeLearners.org.nz</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; }}
-                .error {{ color: #e53e3e; font-size: 1.2em; margin-bottom: 20px; }}
-                .message {{ color: #4a5568; margin-bottom: 30px; }}
-                .back-link {{ color: #2b6cb0; text-decoration: none; }}
-                .back-link:hover {{ text-decoration: underline; }}
-            </style>
-        </head>
-        <body>
-            <div class="error">⚠️ Rate Limit Exceeded</div>
-            <div class="message">
-                You've made too many requests. Please wait a moment before trying again.
-            </div>
-            <a href="/" class="back-link">← Back to Home</a>
-        </body>
-        </html>
-        """,
-        status_code=429
-    )
-
-app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
@@ -87,6 +98,9 @@ SESSION_COOKIE = "session"
 SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
 serializer = URLSafeTimedSerializer(SECRET_KEY)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Simple in-memory session store for OAuth flows
+oauth_sessions: Dict[str, int] = {}
 
 SMTP_HOST = os.getenv("SMTP_HOST", "mailhog")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 1025))
@@ -292,7 +306,9 @@ async def login(request: Request, db: Session = Depends(get_db), email: str = Fo
     
     response = RedirectResponse(url="/", status_code=HTTP_303_SEE_OTHER)
     max_age = SESSION_MAX_AGE if keep_logged_in else 60 * 60 * 2  # 2 hours if not 'keep me logged in'
-    response.set_cookie(SESSION_COOKIE, create_session_cookie(user.id, max_age), max_age=max_age, httponly=True, samesite="lax")
+    session_token = create_session_cookie(user.id, max_age)
+    response.set_cookie(SESSION_COOKIE, session_token, max_age=max_age, httponly=True, samesite="lax", secure=False, path="/")
+    print(f"Regular login - Session cookie set: {SESSION_COOKIE}={session_token[:20]}...")
     return response
 
 @app.get("/logout")
@@ -303,35 +319,70 @@ async def logout():
 
 @app.get("/health")
 async def health_check(db: Session = Depends(get_db)):
-    """Health check endpoint to verify database connectivity and schema status"""
+    # Test database connection and configuration
     try:
-        # Basic database connectivity check
-        db.execute("SELECT 1")
-        
-        # Check if Facebook OAuth columns exist
-        facebook_columns_exist = True
-        try:
-            result = db.execute("SELECT facebook_id FROM users LIMIT 1")
-        except Exception:
-            facebook_columns_exist = False
-        
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "facebook_oauth_schema": "ready" if facebook_columns_exist else "migration_needed",
-            "facebook_oauth_config": "configured" if config.facebook_oauth_enabled else "not_configured"
-        }
+        db.execute(text("SELECT 1"))
+        database_status = "connected"
     except Exception as e:
-        return {
-            "status": "unhealthy",
-            "database": "error",
-            "error": str(e)
-        }
+        database_status = f"error: {e}"
+    
+    # Test Facebook OAuth configuration
+    facebook_config = {
+        "enabled": config.facebook_oauth_enabled,
+        "client_id": config.FACEBOOK_CLIENT_ID[:10] + "..." if config.FACEBOOK_CLIENT_ID else None,
+        "has_secret": bool(config.FACEBOOK_CLIENT_SECRET)
+    }
+    
+    return {
+        "status": "ok",
+        "database": database_status,
+        "facebook_oauth": facebook_config
+    }
+
+@app.get("/debug/session")
+async def debug_session(request: Request, db: Session = Depends(get_db)):
+    """Debug endpoint to check session status and cookies"""
+    # Get all cookies
+    all_cookies = dict(request.cookies)
+    
+    # Check for session cookie specifically
+    session_cookie = request.cookies.get(SESSION_COOKIE)
+    
+    # Try to decode session
+    user_from_session = None
+    session_valid = False
+    if session_cookie:
+        try:
+            data = serializer.loads(session_cookie, max_age=SESSION_MAX_AGE)
+            user_from_session = db.query(User).filter(User.id == data["user_id"]).first()
+            session_valid = True
+        except Exception as e:
+            session_valid = f"Error: {e}"
+    
+    # Check request.state.user (set by middleware)
+    user_from_middleware = getattr(request.state, 'user', 'Not set')
+    
+    return {
+        "all_cookies": all_cookies,
+        "session_cookie_name": SESSION_COOKIE,
+        "session_cookie_value": session_cookie[:20] + "..." if session_cookie else None,
+        "session_valid": session_valid,
+        "user_from_session": {
+            "id": user_from_session.id if user_from_session else None,
+            "email": user_from_session.email if user_from_session else None
+        } if user_from_session else None,
+        "user_from_middleware": {
+            "id": user_from_middleware.id if hasattr(user_from_middleware, 'id') else None,
+            "email": user_from_middleware.email if hasattr(user_from_middleware, 'email') else None
+        } if user_from_middleware and user_from_middleware != 'Not set' else str(user_from_middleware)
+    }
 
 # Facebook OAuth Routes
 @app.get("/auth/facebook")
 async def facebook_login(request: Request):
+    print("Initiating Facebook login process")
     if not config.facebook_oauth_enabled:
+        print("Facebook OAuth is not enabled")
         return templates.TemplateResponse("login.html", {
             "request": request,
             "error": "Facebook login is not configured. Please set FACEBOOK_CLIENT_ID and FACEBOOK_CLIENT_SECRET environment variables.",
@@ -341,6 +392,7 @@ async def facebook_login(request: Request):
     try:
         facebook = oauth.create_client('facebook')
         redirect_uri = config.FACEBOOK_REDIRECT_URI
+        print(f"Redirecting to Facebook with URI: {redirect_uri}")
         return await facebook.authorize_redirect(request, redirect_uri)
     except Exception as e:
         print(f"Facebook OAuth initialization error: {e}")
@@ -352,18 +404,38 @@ async def facebook_login(request: Request):
 
 @app.get("/auth/facebook/callback")
 async def facebook_callback(request: Request, db: Session = Depends(get_db)):
+    print("Received Facebook OAuth callback")
     if not config.facebook_oauth_enabled:
-        raise HTTPException(status_code=404, detail="Facebook login not configured")
+        print("Facebook OAuth is not enabled")
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Facebook login is not configured.",
+            "csrf_token": generate_csrf_token()
+        })
     
     try:
         facebook = oauth.create_client('facebook') 
+        
+        # Check for OAuth errors in the callback
+        if request.query_params.get('error'):
+            error_description = request.query_params.get('error_description', 'Facebook login failed')
+            print(f"Facebook OAuth error from callback: {request.query_params.get('error')}: {error_description}")
+            return templates.TemplateResponse("login.html", {
+                "request": request,
+                "error": "Facebook login was cancelled or failed. Please try again.",
+                "csrf_token": generate_csrf_token()
+            })
+        
         token = await facebook.authorize_access_token(request)
+        print(f"Facebook OAuth token received successfully: {token}")
         
         # Get user info from Facebook
         user_response = await facebook.get('https://graph.facebook.com/me?fields=id,email,first_name,last_name,picture', token=token)
         facebook_user = user_response.json()
+        print(f"Facebook user data received: {facebook_user}")
         
         if not facebook_user.get('email'):
+            print("Facebook account does not have a verified email address")
             return templates.TemplateResponse("login.html", {
                 "request": request,
                 "error": "Facebook account must have a verified email address.",
@@ -373,9 +445,11 @@ async def facebook_callback(request: Request, db: Session = Depends(get_db)):
         # Check if user exists by Facebook ID (handle missing columns gracefully)
         try:
             user = db.query(User).filter(User.facebook_id == facebook_user['id']).first()
+            print(f"User found by Facebook ID: {user}")
         except Exception as e:
             if "does not exist" in str(e):
                 # Database hasn't been migrated yet, fall back to email-only lookup
+                print("Database schema does not support Facebook ID, falling back to email lookup")
                 user = None
             else:
                 raise
@@ -384,6 +458,7 @@ async def facebook_callback(request: Request, db: Session = Depends(get_db)):
             # Check if user exists by email (to link accounts)
             user = db.query(User).filter(User.email == facebook_user['email']).first()
             if user:
+                print(f"User found by email: {user}")
                 # Link existing account to Facebook (if schema supports it)
                 try:
                     user.facebook_id = facebook_user['id']
@@ -392,10 +467,12 @@ async def facebook_callback(request: Request, db: Session = Depends(get_db)):
                     user.profile_picture_url = facebook_user.get('picture', {}).get('data', {}).get('url')
                     if hasattr(user, 'auth_provider') and user.auth_provider == 'email':
                         user.auth_provider = 'both'  # User has both email and Facebook auth
+                    print("Linked existing account to Facebook")
                 except AttributeError:
                     # Schema doesn't have Facebook fields yet - just log the user in
                     print("Warning: Facebook fields not available in database schema. User logged in with existing account.")
             else:
+                print("No existing user found, creating new user")
                 # Create new user
                 try:
                     user = User(
@@ -407,6 +484,7 @@ async def facebook_callback(request: Request, db: Session = Depends(get_db)):
                         auth_provider='facebook',
                         email_confirmed=True  # Facebook emails are considered verified
                     )
+                    print("New user created with Facebook fields")
                 except TypeError:
                     # Schema doesn't have Facebook fields yet - create basic user
                     user = User(
@@ -416,6 +494,7 @@ async def facebook_callback(request: Request, db: Session = Depends(get_db)):
                     print("Warning: Created user without Facebook fields. Please run database migration.")
                 db.add(user)
         else:
+            print("Updating existing Facebook user info")
             # Update existing Facebook user info (if schema supports it)
             try:
                 user.first_name = facebook_user.get('first_name')
@@ -427,17 +506,16 @@ async def facebook_callback(request: Request, db: Session = Depends(get_db)):
         
         db.commit()
         db.refresh(user)
+        print(f"User created/updated successfully: ID={user.id}, Email={user.email}")
         
-        # Create session
-        response = RedirectResponse(url="/", status_code=HTTP_303_SEE_OTHER)
-        response.set_cookie(
-            SESSION_COOKIE, 
-            create_session_cookie(user.id), 
-            max_age=SESSION_MAX_AGE, 
-            httponly=True, 
-            samesite="lax"
-        )
-        return response
+        # Create session token and store it server-side
+        session_token = create_session_cookie(user.id)
+        oauth_session_id = str(uuid.uuid4())
+        oauth_sessions[oauth_session_id] = user.id
+        print(f"Created OAuth session: {oauth_session_id} for user {user.id}")
+        
+        # Redirect to a completion endpoint that will set the final session cookie
+        return RedirectResponse(url=f"/auth/complete?session_id={oauth_session_id}", status_code=HTTP_303_SEE_OTHER)
         
     except Exception as e:
         print(f"Facebook OAuth error: {e}")
@@ -446,6 +524,40 @@ async def facebook_callback(request: Request, db: Session = Depends(get_db)):
             "error": "Facebook login failed. Please try again.",
             "csrf_token": generate_csrf_token()
         })
+
+@app.get("/auth/complete")
+async def auth_complete(request: Request, session_id: str = Query(...)):
+    """Complete the OAuth flow by setting the session cookie"""
+    print(f"Completing OAuth flow for session_id: {session_id}")
+    
+    # Get user ID from OAuth session store
+    user_id = oauth_sessions.get(session_id)
+    if not user_id:
+        print(f"Invalid or expired OAuth session: {session_id}")
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Login session expired. Please try again.",
+            "csrf_token": generate_csrf_token()
+        })
+    
+    # Clean up the OAuth session
+    del oauth_sessions[session_id]
+    print(f"Cleaned up OAuth session: {session_id}")
+    
+    # Create the final session cookie
+    session_token = create_session_cookie(user_id)
+    response = RedirectResponse(url="/", status_code=HTTP_303_SEE_OTHER)
+    response.set_cookie(
+        SESSION_COOKIE, 
+        session_token, 
+        max_age=SESSION_MAX_AGE, 
+        httponly=True, 
+        samesite="lax",
+        secure=False,
+        path="/"
+    )
+    print(f"Set final session cookie for user {user_id}: {session_token[:20]}...")
+    return response
 
 def require_admin(user=Depends(get_current_user)):
     if not user or not user.is_admin:
@@ -530,7 +642,11 @@ async def promote_user(request: Request, db: Session = Depends(get_db), user_id:
 def startup_tasks():
     print("🚀 Starting LifeLearners application...")
     
-    # Check Facebook OAuth configuration
+    # Check Facebook OAuth configuration with debug info
+    print(f"🔍 Debug - Facebook Client ID: {config.FACEBOOK_CLIENT_ID[:10]}..." if config.FACEBOOK_CLIENT_ID else "🔍 Debug - Facebook Client ID: NOT SET")
+    print(f"🔍 Debug - Facebook Secret: {'SET' if config.FACEBOOK_CLIENT_SECRET else 'NOT SET'}")
+    print(f"🔍 Debug - OAuth Enabled: {config.facebook_oauth_enabled}")
+    
     if config.facebook_oauth_enabled:
         print("✅ Facebook OAuth is configured")
     else:
@@ -1285,23 +1401,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     
     return {"status": "success"}
 
-class UserContextMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        db = SessionLocal()
-        user = None
-        session = request.cookies.get(SESSION_COOKIE)
-        if session:
-            try:
-                data = serializer.loads(session, max_age=SESSION_MAX_AGE)
-                user = db.query(User).filter(User.id == data["user_id"]).first()
-            except Exception:
-                user = None
-        request.state.user = user
-        response = await call_next(request)
-        db.close()
-        return response
-
-app.add_middleware(UserContextMiddleware)
+# Middleware will be added after OAuth setup
 
 # Simple email sender
 def send_email(to_email, subject, body):
