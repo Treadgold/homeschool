@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Events – LifeLearners.org.nz{% endblock %}
 {% block extra_head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+
 <style>
     .latest-event-highlight {
         background: linear-gradient(135deg, #2b6cb0 0%, #3182ce 100%);
@@ -134,6 +139,36 @@
         color: white;
     }
     
+    .view-toggle {
+        display: flex;
+        gap: 0.5rem;
+        margin-left: auto;
+        background: #f8f9fa;
+        padding: 0.25rem;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .view-toggle-btn {
+        background: transparent;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: #6c757d;
+        transition: all 0.2s;
+    }
+    
+    .view-toggle-btn.active {
+        background: #2b6cb0;
+        color: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
     .section-header {
         display: flex;
         justify-content: space-between;
@@ -164,11 +199,25 @@
         background: #224e7a;
     }
     
+    .events-container {
+        position: relative;
+        min-height: 500px;
+    }
+    
     .events-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
         gap: 1.5rem;
         margin-bottom: 3rem;
+    }
+    
+    .events-map {
+        display: none;
+        height: 600px;
+        border-radius: 12px;
+        border: 1px solid #dee2e6;
+        margin-bottom: 3rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
     
     .event-card {
@@ -317,6 +366,52 @@
         margin-top: 0.3rem;
     }
     
+    /* Custom map popup styles */
+    .custom-popup .leaflet-popup-content-wrapper {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .custom-popup .leaflet-popup-content {
+        margin: 16px;
+        line-height: 1.4;
+    }
+    
+    .popup-event-title {
+        font-weight: 600;
+        color: #2b6cb0;
+        margin-bottom: 0.5rem;
+        font-size: 1.1rem;
+    }
+    
+    .popup-event-meta {
+        color: #6c757d;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .popup-event-price {
+        font-weight: 600;
+        color: #28a745;
+        margin-bottom: 0.75rem;
+    }
+    
+    .popup-book-btn {
+        background: #28a745;
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 0.9rem;
+        display: inline-block;
+        transition: background 0.2s;
+    }
+    
+    .popup-book-btn:hover {
+        background: #218838;
+    }
+    
     @media (max-width: 768px) {
         .latest-event-highlight {
             flex-direction: column;
@@ -353,6 +448,15 @@
         
         .events-filter {
             justify-content: center;
+        }
+        
+        .view-toggle {
+            margin-left: 0;
+            margin-top: 1rem;
+        }
+        
+        .events-map {
+            height: 400px;
         }
     }
 </style>
@@ -399,6 +503,16 @@
         <button class="filter-btn" onclick="filterEvents('field-trip')">Field Trips</button>
         <button class="filter-btn" onclick="filterEvents('social')">Social Events</button>
         <button class="filter-btn" onclick="filterEvents('free')">Free Events</button>
+        
+        <!-- View Toggle -->
+        <div class="view-toggle">
+            <button class="view-toggle-btn active" onclick="toggleView('list')" id="list-view-btn">
+                <span>📋</span> List View
+            </button>
+            <button class="view-toggle-btn" onclick="toggleView('map')" id="map-view-btn">
+                <span>🗺️</span> Map View
+            </button>
+        </div>
     </div>
 
     <!-- Upcoming Events Section -->
@@ -407,60 +521,74 @@
         <a href="#stats" class="view-all-btn">View Statistics ↓</a>
     </div>
 
-    {% if events %}
-        <div class="events-grid" id="events-grid">
-        {% for event in events %}
-            <div class="event-card" 
-                 data-type="{{ event.event_type }}" 
-                 data-cost="{{ event.cost or 0 }}"
-                 onclick="window.location.href='/event/{{ event.id }}'">
-                <div class="event-header">
-                    <h3 class="event-title">{{ event.title }}</h3>
-                    <span class="event-badge">{{ event.event_type|capitalize }}</span>
+    <div class="events-container">
+        <!-- Events List View -->
+        {% if events %}
+            <div class="events-grid" id="events-grid">
+            {% for event in events %}
+                <div class="event-card" 
+                     data-type="{{ event.event_type }}" 
+                     data-cost="{{ event.cost or 0 }}"
+                     data-lat="{{ event.latitude or '' }}"
+                     data-lng="{{ event.longitude or '' }}"
+                     data-title="{{ event.title }}"
+                     data-location="{{ event.location }}"
+                     data-date="{{ event.date.strftime('%B %d, %Y at %I:%M %p') }}"
+                     data-price="{{ '${:.2f}'.format(event.cost) if event.cost else 'Free' }}"
+                     data-event-id="{{ event.id }}"
+                     onclick="window.location.href='/event/{{ event.id }}'">
+                    <div class="event-header">
+                        <h3 class="event-title">{{ event.title }}</h3>
+                        <span class="event-badge">{{ event.event_type|capitalize }}</span>
+                    </div>
+                    
+                    <div class="event-meta">
+                        <div class="event-meta-item">
+                            <span>📅</span>
+                            <span>{{ event.date.strftime('%B %d, %Y') }}</span>
+                        </div>
+                        <div class="event-meta-item">
+                            <span>🕐</span>
+                            <span>{{ event.date.strftime('%I:%M %p') }}</span>
+                        </div>
+                        <div class="event-meta-item">
+                            <span>📍</span>
+                            <span>{{ event.location }}</span>
+                        </div>
+                    </div>
+                    
+                    {% if event.description %}
+                    <div class="event-description">{{ event.description }}</div>
+                    {% endif %}
+                    
+                    <div class="event-footer">
+                        <div>
+                            {% if event.cost %}
+                            <span class="event-price">${{ '%.2f' % event.cost }}</span>
+                            {% else %}
+                            <span class="event-price" style="color: #28a745;">Free</span>
+                            {% endif %}
+                            {% if event.max_pupils %}
+                            <span class="event-capacity"> • {{ event.max_pupils }} spots</span>
+                            {% endif %}
+                        </div>
+                        <a href="/event/{{ event.id }}/book" class="book-btn" onclick="event.stopPropagation()">Book Now</a>
+                    </div>
                 </div>
-                
-                <div class="event-meta">
-                    <div class="event-meta-item">
-                        <span>📅</span>
-                        <span>{{ event.date.strftime('%B %d, %Y') }}</span>
-                    </div>
-                    <div class="event-meta-item">
-                        <span>🕐</span>
-                        <span>{{ event.date.strftime('%I:%M %p') }}</span>
-                    </div>
-                    <div class="event-meta-item">
-                        <span>📍</span>
-                        <span>{{ event.location }}</span>
-                    </div>
-                </div>
-                
-                {% if event.description %}
-                <div class="event-description">{{ event.description }}</div>
-                {% endif %}
-                
-                <div class="event-footer">
-                    <div>
-                        {% if event.cost %}
-                        <span class="event-price">${{ '%.2f' % event.cost }}</span>
-                        {% else %}
-                        <span class="event-price" style="color: #28a745;">Free</span>
-                        {% endif %}
-                        {% if event.max_pupils %}
-                        <span class="event-capacity"> • {{ event.max_pupils }} spots</span>
-                        {% endif %}
-                    </div>
-                    <a href="/event/{{ event.id }}/book" class="book-btn" onclick="event.stopPropagation()">Book Now</a>
-                </div>
+            {% endfor %}
             </div>
-        {% endfor %}
-        </div>
-    {% else %}
-        <div class="no-events">
-            <h3>No events scheduled yet</h3>
-            <p>We're working on exciting new events for our homeschool community!</p>
-            <a class="cta" href="mailto:info@lifelearners.org.nz">Contact us to suggest an event</a>
-        </div>
-    {% endif %}
+            
+            <!-- Events Map View -->
+            <div id="events-map" class="events-map"></div>
+            
+        {% else %}
+            <div class="no-events">
+                <h3>No events scheduled yet</h3>
+                <p>We're working on exciting new events for our homeschool community!</p>
+                <a class="cta" href="mailto:info@lifelearners.org.nz">Contact us to suggest an event</a>
+            </div>
+        {% endif %}
+    </div>
 
     <!-- Quick Stats Section -->
     <div id="stats" class="quick-stats">
@@ -481,49 +609,202 @@
             <span class="stat-label">Field Trips</span>
         </div>
     </div>
+{% endblock %}
 
-    <script>
-    function filterEvents(type) {
-        const cards = document.querySelectorAll('.event-card');
-        const filterBtns = document.querySelectorAll('.filter-btn');
+{% block extra_scripts %}
+<!-- Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+<script>
+let map;
+let markers = [];
+let markerClusterGroup;
+let isMapInitialized = false;
+
+// Function to geocode addresses (simplified - in production use a proper geocoding service)
+function getCoordinatesForLocation(location) {
+    // Simplified geocoding for New Zealand locations
+    const locationMap = {
+        'Auckland': [-36.8485, 174.7633],
+        'Wellington': [-41.2865, 174.7762],
+        'Christchurch': [-43.5321, 172.6362],
+        'Hamilton': [-37.7870, 175.2793],
+        'Dunedin': [-45.8788, 170.5028],
+        'Palmerston North': [-40.3523, 175.6082],
+        'Tauranga': [-37.6878, 176.2497],
+        'Queenstown': [-45.0312, 168.6626],
+        'Rotorua': [-38.1368, 176.2497],
+        'Napier': [-39.4928, 176.9120],
+        'New Plymouth': [-39.0579, 174.0806],
+        'Cambridge': [-37.8886, 175.4678],
+        'Waitangi': [-35.2581, 174.0878],
+        'Lake Tekapo': [-44.0045, 170.4770]
+    };
+    
+    // Try to find coordinates based on location string
+    for (let city in locationMap) {
+        if (location.toLowerCase().includes(city.toLowerCase())) {
+            // Add some random offset for variety
+            const lat = locationMap[city][0] + (Math.random() - 0.5) * 0.02;
+            const lng = locationMap[city][1] + (Math.random() - 0.5) * 0.02;
+            return [lat, lng];
+        }
+    }
+    
+    // Default to Auckland with random offset if no match
+    return [-36.8485 + (Math.random() - 0.5) * 0.1, 174.7633 + (Math.random() - 0.5) * 0.1];
+}
+
+function initializeMap() {
+    if (isMapInitialized) return;
+    
+    // Initialize map centered on New Zealand
+    map = L.map('events-map').setView([-40.9006, 174.8860], 6);
+    
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    
+    // Initialize marker cluster group
+    markerClusterGroup = L.markerClusterGroup({
+        chunkedLoading: true,
+        maxClusterRadius: 50
+    });
+    
+    // Add markers for all events
+    const eventCards = document.querySelectorAll('.event-card');
+    eventCards.forEach(function(card) {
+        const location = card.dataset.location;
+        const title = card.dataset.title;
+        const date = card.dataset.date;
+        const price = card.dataset.price;
+        const eventId = card.dataset.eventId;
         
-        // Update active filter button
-        filterBtns.forEach(btn => btn.classList.remove('active'));
-        event.target.classList.add('active');
+        if (location) {
+            const coords = getCoordinatesForLocation(location);
+            
+            // Create custom icon based on event type
+            const isPaid = price !== 'Free';
+            const iconColor = isPaid ? '#dc3545' : '#28a745'; // Red for paid, green for free
+            
+            const customIcon = L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="background-color: ${iconColor}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+            
+            const marker = L.marker(coords, { icon: customIcon });
+            
+            // Create popup content
+            const popupContent = `
+                <div class="popup-event-title">${title}</div>
+                <div class="popup-event-meta">📅 ${date}</div>
+                <div class="popup-event-meta">📍 ${location}</div>
+                <div class="popup-event-price">${price}</div>
+                <a href="/event/${eventId}/book" class="popup-book-btn">Book Now</a>
+            `;
+            
+            marker.bindPopup(popupContent, {
+                className: 'custom-popup'
+            });
+            
+            markerClusterGroup.addLayer(marker);
+            markers.push(marker);
+        }
+    });
+    
+    map.addLayer(markerClusterGroup);
+    isMapInitialized = true;
+}
+
+function toggleView(viewType) {
+    const listView = document.getElementById('events-grid');
+    const mapView = document.getElementById('events-map');
+    const listBtn = document.getElementById('list-view-btn');
+    const mapBtn = document.getElementById('map-view-btn');
+    
+    if (viewType === 'map') {
+        listView.style.display = 'none';
+        mapView.style.display = 'block';
+        listBtn.classList.remove('active');
+        mapBtn.classList.add('active');
         
-        // Filter events
-        cards.forEach(card => {
-            const cardType = card.dataset.type;
-            const cardCost = parseFloat(card.dataset.cost);
-            
-            let shouldShow = false;
-            
-            switch(type) {
-                case 'all':
-                    shouldShow = true;
-                    break;
-                case 'workshop':
-                    shouldShow = cardType === 'workshop';
-                    break;
-                case 'field-trip':
-                    shouldShow = cardType === 'offsite';
-                    break;
-                case 'social':
-                    shouldShow = cardType === 'social';
-                    break;
-                case 'free':
-                    shouldShow = cardCost === 0;
-                    break;
-            }
-            
-            if (shouldShow) {
-                card.style.display = 'block';
-                setTimeout(() => card.style.opacity = '1', 10);
-            } else {
-                card.style.opacity = '0';
-                setTimeout(() => card.style.display = 'none', 200);
+        // Initialize map if needed
+        if (!isMapInitialized) {
+            setTimeout(initializeMap, 100); // Small delay to ensure div is visible
+        } else {
+            // Resize map in case container changed
+            setTimeout(() => map.invalidateSize(), 100);
+        }
+    } else {
+        listView.style.display = 'grid';
+        mapView.style.display = 'none';
+        listBtn.classList.add('active');
+        mapBtn.classList.remove('active');
+    }
+}
+
+function filterEvents(type) {
+    const cards = document.querySelectorAll('.event-card');
+    const filterBtns = document.querySelectorAll('.filter-btn');
+    
+    // Update active filter button
+    filterBtns.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // Filter events in list view
+    cards.forEach(card => {
+        const cardType = card.dataset.type;
+        const cardCost = parseFloat(card.dataset.cost);
+        
+        let shouldShow = false;
+        
+        switch(type) {
+            case 'all':
+                shouldShow = true;
+                break;
+            case 'workshop':
+                shouldShow = cardType === 'workshop';
+                break;
+            case 'field-trip':
+                shouldShow = cardType === 'offsite';
+                break;
+            case 'social':
+                shouldShow = cardType === 'social';
+                break;
+            case 'free':
+                shouldShow = cardCost === 0;
+                break;
+        }
+        
+        if (shouldShow) {
+            card.style.display = 'block';
+            setTimeout(() => card.style.opacity = '1', 10);
+        } else {
+            card.style.opacity = '0';
+            setTimeout(() => card.style.display = 'none', 200);
+        }
+    });
+    
+    // Filter markers in map view
+    if (isMapInitialized && markerClusterGroup) {
+        markerClusterGroup.clearLayers();
+        
+        cards.forEach((card, index) => {
+            if (card.style.display !== 'none' && markers[index]) {
+                markerClusterGroup.addLayer(markers[index]);
             }
         });
     }
-    </script>
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default view to list
+    toggleView('list');
+});
+</script>
 {% endblock %} 

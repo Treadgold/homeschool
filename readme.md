@@ -12,13 +12,15 @@ Transform your homeschool community with our comprehensive event management plat
 - **Smart Booking System** - Book events with instant confirmation and easy cancellation
 - **Family Dashboard** - Manage all your bookings, children's profiles, and event history in one place
 - **Mobile-First Design** - Access everything on any device, anywhere
+- **Secure Payment Processing** - Integrated Stripe payment system with instant confirmations
 
 ### For Event Organizers & Admins
 - **Complete Event Management** - Create, edit, and manage events with rich content and image uploads
 - **Advanced Admin Dashboard** - Real-time statistics, user management, and financial tracking
-- **Payment Processing** - Integrated Stripe payment system with refund capabilities
+- **Integrated Payment System** - Full Stripe payment processing with refund capabilities
 - **Photo Gallery Management** - Upload and manage community photos with titles and descriptions
 - **Comprehensive Analytics** - Track attendance, revenue, user engagement, and event performance
+- **Calendar View** - Visual calendar interface for managing all events
 
 ## ✨ Feature Showcase
 
@@ -29,6 +31,7 @@ Transform your homeschool community with our comprehensive event management plat
 - **Real-Time Capacity Tracking** - Automatic booking limits and availability updates
 - **Event Categories** - Organize events by type (Science, Arts, Outdoor, etc.)
 - **Location Details** - Comprehensive venue information and directions
+- **Admin Calendar View** - Visual calendar interface with color-coded event status indicators
 
 ### 👨‍👩‍👧‍👦 **Family & Child Management**
 - **Child Profiles** - Store names, ages, allergies, special needs, and additional notes
@@ -36,34 +39,40 @@ Transform your homeschool community with our comprehensive event management plat
 - **Allergy & Medical Information** - Critical health and safety data for event organizers
 - **Family Dashboard** - Centralized view of all children and their bookings
 - **Profile Updates** - Easy editing of child information and preferences
+- **Multi-Child Booking** - Book multiple children for events simultaneously
 
 ### 💳 **Payment & Financial Management**
-- **Stripe Integration** - Secure payment processing with multiple payment methods
+- **Full Stripe Integration** - Secure payment processing with multiple payment methods
+- **Checkout Session Management** - Seamless Stripe Checkout experience
 - **Payment Status Tracking** - Real-time payment confirmation and status updates
+- **Webhook Processing** - Automatic payment confirmation via Stripe webhooks
 - **Refund Processing** - Admin-controlled refund system with reason tracking
 - **Financial Dashboard** - Revenue tracking, payment analytics, and financial reporting
-- **Manual Payment Entry** - Support for cash payments and external transactions
+- **Mock Payment Mode** - Development-friendly payment simulation
+- **NZD Currency Support** - Optimized for New Zealand pricing
 
 ### 📊 **Advanced Analytics & Reporting**
 - **Real-Time Statistics** - Live dashboard with key metrics and trends
 - **Event Performance Analytics** - Track attendance, capacity utilization, and popularity
 - **User Engagement Metrics** - Monitor registration trends and user activity
 - **Financial Reporting** - Revenue analysis, payment tracking, and financial insights
-- **Export Capabilities** - Download reports in various formats for external analysis
+- **Booking Management** - Detailed participant lists and booking analytics
+- **Export Capabilities** - Comprehensive admin tools for data management
 
 ### 🖼️ **Photo Gallery System**
 - **Community Photo Sharing** - Upload and display event photos with titles and descriptions
 - **Admin Gallery Management** - Full control over photo uploads, editing, and deletion
 - **Responsive Gallery Grid** - Beautiful, mobile-friendly photo display
 - **Upload Date Tracking** - Automatic timestamping of all gallery content
-- **Image Optimization** - Automatic resizing and compression for optimal performance
+- **Image Optimization** - Secure file handling with UUID-based naming
 
 ### 🔐 **Security & User Management**
-- **Secure Authentication** - Email confirmation, password hashing, and session management
-- **Rate Limiting** - Protection against abuse with intelligent request throttling
+- **Multi-Provider Authentication** - Email, Facebook, and Google OAuth integration
+- **Email Confirmation System** - Required email verification for account activation
+- **Rate Limiting Protection** - Intelligent request throttling on sensitive endpoints
 - **CSRF Protection** - Form security with token validation
 - **Admin User Management** - Promote users to admin status with full system access
-- **Email Verification** - Required email confirmation for account activation
+- **Password Security** - Bcrypt hashing with salt for maximum security
 
 ### 📧 **Communication System**
 - **Automated Email Notifications** - Booking confirmations, event reminders, and updates
@@ -71,53 +80,58 @@ Transform your homeschool community with our comprehensive event management plat
 - **Resend Confirmation** - User-friendly email re-sending functionality
 - **SMTP Integration** - Professional email delivery with custom branding
 - **Development Email Testing** - MailHog integration for local development
+- **Multi-Provider OAuth** - Social login integration with Facebook and Google
 
 ## 🛠 Technology Stack
 
 ### **Modern Backend Architecture**
-- **FastAPI** - High-performance, modern Python web framework
+- **FastAPI** - High-performance, modern Python web framework with async support
 - **SQLAlchemy ORM** - Robust database abstraction and query building
-- **PostgreSQL** - Enterprise-grade relational database
+- **PostgreSQL/SQLite** - Production PostgreSQL with SQLite for development
 - **Alembic** - Database migration management with version control
 
 ### **Security & Authentication**
 - **Bcrypt** - Industry-standard password hashing with salt
 - **Session Management** - Secure HTTP-only cookies with encryption
-- **Rate Limiting** - IP-based request throttling with SlowAPI
-- **CSRF Protection** - Token-based form security
+- **SlowAPI Rate Limiting** - IP-based request throttling with configurable limits
+- **CSRF Protection** - Token-based form security across all endpoints
+- **OAuth Integration** - Facebook and Google OAuth with Authlib
 
 ### **Payment & Financial**
 - **Stripe API** - World-class payment processing integration
 - **Webhook Handling** - Real-time payment event processing
 - **Refund Management** - Automated and manual refund capabilities
+- **Multi-Currency Support** - NZD primary with international expansion ready
 
 ### **File Management & Media**
 - **Secure File Uploads** - Image validation, optimization, and secure storage
 - **Static File Serving** - Efficient delivery of images, CSS, and JavaScript
 - **UUID-based Filenames** - Secure, collision-resistant file naming
+- **Gallery Management** - Complete photo management system
 
 ### **Development & Deployment**
 - **Docker & Docker Compose** - Containerized deployment with multi-service orchestration
-- **Uvicorn** - High-performance ASGI server
+- **Uvicorn** - High-performance ASGI server with hot reloading
 - **Environment Configuration** - Flexible configuration management
-- **Development Tools** - MailHog for email testing, hot reloading
+- **MailHog** - Email testing in development environment
 
 ## 📁 Project Architecture
 
 ```
 homeschool/
 ├── app/
-│   ├── main.py              # FastAPI application with all routes and business logic
+│   ├── main.py              # FastAPI application with all routes and business logic (1900+ lines)
 │   ├── models.py            # SQLAlchemy database models and relationships
 │   ├── database.py          # Database connection and session management
+│   ├── config.py            # Environment configuration and settings
+│   ├── payment_service.py   # Stripe integration and payment processing
 │   ├── static/              # Static assets and uploaded content
 │   │   ├── event_images/    # Event photos with secure storage
 │   │   ├── gallery/         # Community photo gallery
-│   │   ├── videos/          # Video content and media
 │   │   └── style.css        # Modern, responsive styling
-│   └── templates/           # Jinja2 HTML templates
+│   └── templates/           # Jinja2 HTML templates (27 template files)
 │       ├── base.html        # Base template with navigation and layout
-│       ├── landing.html     # Homepage with video hero section
+│       ├── landing.html     # Homepage with hero section
 │       ├── admin_*.html     # Comprehensive admin interface templates
 │       ├── auth/            # Authentication and user management
 │       └── events/          # Event-related templates
@@ -127,6 +141,8 @@ homeschool/
 ├── requirements.txt         # Python dependencies and versions
 ├── docker-compose.yml       # Multi-container orchestration
 ├── Dockerfile              # Application container definition
+├── PAYMENT_SETUP_GUIDE.md   # Comprehensive payment setup documentation
+├── FACEBOOK_SETUP_GUIDE.md  # Facebook OAuth setup guide
 └── readme.md               # This comprehensive documentation
 ```
 
@@ -158,6 +174,19 @@ SMTP_USER=
 SMTP_PASS=
 SITE_URL=http://localhost:8000
 
+# Payment Configuration (Optional for development)
+ENABLE_PAYMENTS=true
+STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_key
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+STRIPE_CURRENCY=nzd
+
+# OAuth Configuration (Optional)
+FACEBOOK_CLIENT_ID=your_facebook_client_id
+FACEBOOK_CLIENT_SECRET=your_facebook_client_secret
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+
 # Test Users (auto-created on startup)
 TEST_USER_EMAIL=testuser@example.com
 TEST_USER_PASSWORD=testuser123
@@ -182,94 +211,107 @@ docker-compose exec web alembic upgrade head
 ```
 
 ### **5. Explore the Features**
-- **🏠 Homepage**: http://localhost:8000
-- **📅 Events**: http://localhost:8000/events
-- **👤 Signup**: http://localhost:8000/signup
-- **🔐 Login**: http://localhost:8000/login
-- **📊 Admin Dashboard**: http://localhost:8000/admin
-- **🖼️ Photo Gallery**: http://localhost:8000/gallery
+- **🏠 Homepage**: http://localhost:8000 - Landing page with hero section
+- **📅 Events**: http://localhost:8000/events - Browse all events
+- **👤 Signup**: http://localhost:8000/signup - Create new account
+- **🔐 Login**: http://localhost:8000/login - User authentication
+- **👶 Profile**: http://localhost:8000/profile - Manage account and children
+- **📊 Admin Dashboard**: http://localhost:8000/admin - Admin overview
+- **🖼️ Photo Gallery**: http://localhost:8000/gallery - Community photos
+- **💳 Payment Admin**: http://localhost:8000/admin/payments - Payment management
+- **📅 Event Calendar**: http://localhost:8000/admin/events/calendar - Visual calendar
 
 ## 📊 Database Schema
 
 ### **Core Models & Relationships**
-- **User** - Authentication, profile information, admin status
-- **Event** - Event details, capacity, pricing, location, categories
-- **Child** - Family member information, allergies, special needs
+- **User** - Authentication, profile information, admin status, OAuth integration
+- **Event** - Event details, capacity, pricing, location, categories, multi-part support
+- **Child** - Family member information, allergies, special needs, assisting adult flags
 - **Booking** - Event registrations with payment status and volunteer info
-- **GalleryImage** - Community photos with titles and descriptions
+- **GalleryImage** - Community photos with titles, descriptions, and upload tracking
 
 ### **Key Features**
-- **Multi-Child Support** - Users can register multiple children
-- **Flexible Booking System** - Support for paid and free events
-- **Payment Integration** - Stripe payment processing with status tracking
-- **Admin Hierarchy** - User promotion system for community management
-- **Rich Content** - Image uploads, descriptions, and metadata
+- OAuth integration fields (Facebook ID, Google ID, auth provider)
+- Payment tracking (Stripe payment IDs, payment status)
+- Comprehensive child information (allergies, special needs, assisting adults)
+- Event categorization and multi-part event support
+- Gallery management with metadata
 
-## 🔒 Security Features
+## 💻 Development Features
 
-### **Authentication & Authorization**
-- **Secure Password Hashing** - Bcrypt with salt for maximum security
-- **Email Confirmation** - Required email verification for account activation
-- **Session Management** - Encrypted, HTTP-only session cookies
-- **Admin Access Control** - Role-based permissions and user promotion
+### **Payment System**
+- **Development Mode**: Mock payment service for testing without Stripe keys
+- **Test Mode**: Full Stripe integration with test keys
+- **Production Mode**: Live payment processing
+- **Webhook Support**: Automatic payment confirmation
+- **Refund Processing**: Admin-controlled refund system
 
-### **Rate Limiting & Protection**
-- **Signup Protection** - 5 requests per minute per IP
-- **Login Protection** - 10 requests per minute per IP
-- **Email Confirmation** - 3 requests per minute per IP
-- **CSRF Protection** - Token validation on all forms
+### **Authentication Options**
+- **Email/Password**: Traditional authentication with email confirmation
+- **Facebook OAuth**: Social login integration
+- **Google OAuth**: Google account integration
+- **Admin Management**: Promote users to admin status
 
-### **Data Security**
-- **Input Validation** - Comprehensive data validation and sanitization
-- **SQL Injection Prevention** - Parameterized queries via SQLAlchemy
-- **File Upload Security** - Type validation and secure storage
-- **XSS Protection** - Content sanitization and secure templates
+### **Development Tools**
+- **MailHog**: Email testing in development
+- **Hot Reload**: Automatic code reload during development
+- **Database Migrations**: Version-controlled schema changes
+- **Health Checks**: Application monitoring endpoints
 
-## 📧 Email System
+## 📋 Recent Updates & Completions
 
-### **Automated Communications**
-- **Welcome Emails** - New user onboarding with email confirmation
-- **Booking Confirmations** - Instant booking confirmation emails
-- **Event Reminders** - Automated event reminders and updates
-- **Payment Confirmations** - Payment receipt and status updates
+### **✅ Recently Completed Features**
+- ✅ **Full Stripe Payment Integration** - Complete payment processing system
+- ✅ **Admin Calendar View** - Visual calendar interface for event management
+- ✅ **Enhanced Booking Management** - Detailed participant tracking and management
+- ✅ **OAuth Integration** - Facebook and Google social login
+- ✅ **Gallery System** - Complete photo gallery with admin management
+- ✅ **Rate Limiting & Security** - Comprehensive security measures
+- ✅ **Payment Webhook Handling** - Automatic payment confirmation
+- ✅ **Multi-Child Booking** - Book multiple children simultaneously
+- ✅ **Admin Analytics** - Comprehensive statistics and reporting
 
-### **Admin Notifications**
-- **New Booking Alerts** - Real-time notifications for event organizers
-- **Capacity Alerts** - Automatic notifications when events reach capacity
-- **Payment Notifications** - Instant alerts for successful payments
-- **System Monitoring** - Error alerts and system status notifications
+### **🔄 Current Focus Areas**
+- Payment system testing and optimization
+- User experience improvements
+- Performance optimization
+- Security enhancements
 
-## 🎨 User Experience
+## 🎯 Getting Started for Developers
 
-### **Responsive Design**
-- **Mobile-First Approach** - Optimized for all device sizes
-- **Touch-Friendly Interface** - Intuitive navigation and interactions
-- **Fast Loading** - Optimized images and efficient code delivery
-- **Accessibility** - WCAG compliant design principles
+1. **Quick Start**: Use the Docker setup for immediate development
+2. **Payment Testing**: Review `PAYMENT_SETUP_GUIDE.md` for Stripe integration
+3. **OAuth Setup**: Check `FACEBOOK_SETUP_GUIDE.md` for social login configuration
+4. **Database Changes**: Use Alembic for schema migrations
+5. **Testing**: Use test user accounts created automatically on startup
 
-### **Modern Interface**
-- **Clean, Professional Design** - Beautiful, modern UI components
-- **Intuitive Navigation** - Easy-to-use menu system and breadcrumbs
-- **Dynamic Interactions** - JavaScript-enhanced user experience
-- **Progressive Enhancement** - Core functionality works without JavaScript
+## 📚 Documentation
 
-## 🚀 Deployment & Production
+- **Payment Setup**: `PAYMENT_SETUP_GUIDE.md` - Comprehensive payment integration guide
+- **Facebook OAuth**: `FACEBOOK_SETUP_GUIDE.md` - Social login setup
+- **Todo List**: `todo-list.md` - Development roadmap and task tracking
+- **Environment**: `.env.example` - Configuration template
 
-### **Production Considerations**
-- **SSL/TLS Certificates** - Secure HTTPS connections
-- **Production Database** - Optimized PostgreSQL configuration
-- **Email Service** - Professional SMTP service integration
-- **Monitoring & Logging** - Application monitoring and error tracking
-- **Backup Strategy** - Automated database and file backups
+## 🔧 Configuration
 
-### **Docker Production Deployment**
-```bash
-# Build production image
-docker build -t lifelearners:latest .
+The application supports flexible configuration through environment variables:
+- **Database**: PostgreSQL for production, SQLite for development
+- **Payments**: Optional Stripe integration with mock mode
+- **Email**: SMTP configuration with MailHog for testing
+- **OAuth**: Optional Facebook and Google integration
+- **Security**: Configurable rate limiting and CSRF protection
 
-# Run with production settings
-docker run -p 8000:8000 --env-file .env.prod lifelearners:latest
-```
+## 🚀 Production Deployment
+
+The application is production-ready with:
+- Docker containerization
+- Database migrations
+- Security hardening
+- Payment processing
+- Email system
+- Monitoring and health checks
+
+For production deployment, update the environment variables for your production environment and ensure proper security configurations are in place.
 
 ## 🤝 Community & Support
 
