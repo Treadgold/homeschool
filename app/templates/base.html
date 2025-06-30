@@ -5,91 +5,116 @@
     <title>{% block title %}LifeLearners.org.nz{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="/static/style.css">
-    <style>
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: #f7fafc;
-            margin: 0;
-            padding: 0;
-            color: #222;
-        }
-        header {
-            background: #2b6cb0;
-            color: #fff;
-            padding: 2rem 1rem 1rem 1rem;
-            text-align: center;
-        }
-        header h1 {
-            margin: 0 0 0.5rem 0;
-            font-size: 2.5rem;
-            letter-spacing: 1px;
-        }
-        header p {
-            margin: 0;
-            font-size: 1.2rem;
-        }
-        .cta {
-            display: inline-block;
-            margin-top: 1.5rem;
-            background: #2b6cb0;
-            color: #fff;
-            padding: 0.7rem 1.5rem;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: background 0.2s;
-        }
-        .cta:hover {
-            background: #224e7a;
-        }
-        .cta.cta-light {
-            background: #fff;
-            color: #2b6cb0;
-        }
-        .cta.cta-light:hover {
-            background: #e2e8f0;
-        }
-        .cta.cta-admin {
-            background: #d53f8c;
-        }
-        .cta.cta-admin:hover {
-            background: #b83280;
-        }
-        main {
-            max-width: 700px;
-            margin: 2rem auto;
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(44, 62, 80, 0.08);
-            padding: 2rem;
-        }
-    </style>
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
     <header>
         <h1>LifeLearners.org.nz</h1>
         <p>Empowering homeschoolers with engaging events, workshops, and community learning in New Zealand.</p>
-        <div style="margin-top: 1.5rem;">
-            <a href="/" class="cta cta-light" style="margin-right: 0.7rem;">Home</a>
-            <a href="/events" class="cta cta-light" style="margin-right: 0.7rem;">Events</a>
-            <a href="/gallery" class="cta cta-light" style="margin-right: 0.7rem;">Gallery</a>
+        <div class="nav-top-margin">
+            <a href="/" class="cta cta-light nav-spacing">Home</a>
+            <a href="/events" class="cta cta-light nav-spacing">Events</a>
+            <a href="/gallery" class="cta cta-light nav-spacing">Gallery</a>
             {% if request.state.user %}
-                <a href="/children" class="cta cta-light" style="margin-right: 0.7rem;">Children</a>
+                <a href="/children" class="cta cta-light nav-spacing">Children</a>
                 {% if request.state.user.is_admin %}
-                    <a href="/admin" class="cta cta-admin" style="margin-right: 0.7rem;">Admin</a>
+                    <a href="/admin" class="cta cta-admin nav-spacing">Admin</a>
+                    <a href="/ai-create-event" class="cta cta-ai nav-spacing">🤖 AI Create</a>
+                    <a href="/admin/ai-models" class="cta cta-ai-models nav-spacing">⚙️ AI Models</a>
                 {% endif %}
-                <a href="/profile" class="cta" style="background:#38a169; margin-right: 0.7rem;">Profile</a>
-                <a href="/logout" class="cta" style="background:#d69e2e;">Logout</a>
+                <a href="/profile" class="cta cta-profile nav-spacing">Profile</a>
+                <a href="/logout" class="cta cta-signup">Logout</a>
             {% else %}
-                <a href="/login" class="cta" style="background:#38a169; margin-right: 0.7rem;">Login</a>
-                <a href="/signup" class="cta" style="background:#d69e2e;">Sign Up</a>
+                <a href="/login" class="cta cta-profile nav-spacing">Login</a>
+                <a href="/signup" class="cta cta-signup">Sign Up</a>
             {% endif %}
         </div>
     </header>
     <main>
         {% block content %}{% endblock %}
     </main>
+    
+    <script>
+    // Desktop layout detection for admin and create event pages
+    function updateDesktopLayout() {
+        const body = document.body;
+        const path = window.location.pathname;
+        const isWideScreen = window.innerWidth >= 992;
+        
+        // Remove existing desktop classes
+        body.classList.remove('desktop-admin', 'desktop-create-event');
+        
+        // Remove any existing desktop indicator
+        const existingIndicator = document.querySelector('.desktop-indicator');
+        if (existingIndicator) {
+            existingIndicator.remove();
+        }
+        
+        if (isWideScreen) {
+            // Check if we're on create event pages first (these get special layout)
+            if (path === '/admin/events/new' || path === '/ai-create-event') {
+                body.classList.add('desktop-create-event');
+                showDesktopIndicator('Create Event Desktop Mode');
+            }
+            // Check if we're on other admin pages
+            else if (path.startsWith('/admin')) {
+                body.classList.add('desktop-admin');
+                showDesktopIndicator('Admin Desktop Mode');
+            }
+        }
+    }
+    
+    function showDesktopIndicator(text) {
+        const indicator = document.createElement('div');
+        indicator.className = 'desktop-indicator';
+        indicator.textContent = text;
+        indicator.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #38a169;
+            color: white;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            opacity: 0;
+            transition: opacity 0.3s;
+        `;
+        document.body.appendChild(indicator);
+        
+        // Fade in
+        setTimeout(() => indicator.style.opacity = '1', 100);
+        
+        // Fade out after 3 seconds
+        setTimeout(() => {
+            indicator.style.opacity = '0';
+            setTimeout(() => {
+                if (indicator.parentNode) {
+                    indicator.parentNode.removeChild(indicator);
+                }
+            }, 300);
+        }, 3000);
+    }
+    
+    // Run on page load
+    document.addEventListener('DOMContentLoaded', updateDesktopLayout);
+    
+    // Update on window resize with debouncing
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(updateDesktopLayout, 150);
+    });
+    
+    // Update on HTMX navigation (for SPA-like behavior)
+    document.addEventListener('htmx:afterSettle', updateDesktopLayout);
+    </script>
+    
     {% block extra_scripts %}{% endblock %}
 </body>
 </html> 

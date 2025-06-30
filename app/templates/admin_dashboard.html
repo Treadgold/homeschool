@@ -101,10 +101,51 @@
         color: #718096;
         font-size: 0.8rem;
     }
+    .desktop-demo {
+        background: linear-gradient(135deg, #e6fffa 0%, #f0fff4 100%);
+        border: 2px solid #38a169;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+    
+    .desktop-demo h3 {
+        color: #2f855a;
+        margin: 0 0 0.5rem 0;
+    }
+    
+    .desktop-demo p {
+        margin: 0;
+        color: #2d3748;
+    }
+    
+    .screen-info {
+        font-family: monospace;
+        background: #f7fafc;
+        padding: 0.5rem;
+        border-radius: 4px;
+        margin-top: 0.5rem;
+        display: inline-block;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
+<div class="desktop-demo">
+    <h3>🖥️ Desktop Layout System Active</h3>
+    <p>This admin interface automatically detects wide screens and optimizes the layout for desktop use!</p>
+    <div class="screen-info" id="screenInfo">Screen Width: <span id="screenWidth"></span>px</div>
+</div>
+
+<script>
+function updateScreenInfo() {
+    document.getElementById('screenWidth').textContent = window.innerWidth;
+}
+updateScreenInfo();
+window.addEventListener('resize', updateScreenInfo);
+</script>
+
 <h1>Admin Dashboard</h1>
 <p>Welcome back, {{ current_user.email }}! Here's an overview of your LifeLearners platform.</p>
 

@@ -1,0 +1,664 @@
+{% extends "base.html" %}
+
+{% block title %}AI Model Management{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">🤖 AI Model Management</h4>
+                    <small>Configure and test AI providers for event creation</small>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Current Model Display -->
+                    <div class="alert alert-info">
+                        <h6><strong>Currently Active Model:</strong></h6>
+                        <span class="badge badge-primary">{{ current_model }}</span>
+                        <br><br>
+                        <small><strong>Ollama Endpoint:</strong> <code id="ollama-endpoint">Loading...</code></small>
+                    </div>
+                    
+                    <!-- Available Models -->
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5>Available AI Models</h5>
+                        <div>
+                            <button class="btn btn-sm btn-success" onclick="testDynamicConnection()" id="dynamic-test-btn">
+                                🔗 Test Dynamic Connection
+                            </button>
+                            <button class="btn btn-sm btn-info" onclick="refreshOllamaModels()">
+                                🔄 Refresh Ollama Models
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Dynamic Connection Test Results -->
+                    <div id="dynamic-test-result" class="mt-3" style="display: none;">
+                        <div class="alert" id="dynamic-test-alert"></div>
+                    </div>
+                    
+                    {% for model_key, config in available_models.items() %}
+                    <div class="card mb-3 {% if model_key == current_model %}border-success{% endif %}">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-0">
+                                    {% if config.provider == "ollama" %}🏠{% elif config.provider == "openai" %}🌐{% elif config.provider == "anthropic" %}🧠{% endif %}
+                                    {{ model_key.replace('_', ' ').title() }}
+                                    {% if model_key == current_model %}
+                                        <span class="badge badge-success">ACTIVE</span>
+                                    {% endif %}
+                                </h6>
+                                <small class="text-muted">{{ config.provider.title() }} - {{ config.model_name }}</small>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-secondary" onclick="testModel('{{ model_key }}')" id="test-btn-{{ model_key }}">
+                                    Test
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="cancelTest('{{ model_key }}')" id="cancel-btn-{{ model_key }}" style="display: none;">
+                                    Cancel
+                                </button>
+                                {% if model_key != current_model %}
+                                <button class="btn btn-sm btn-primary" onclick="setCurrentModel('{{ model_key }}')">
+                                    Use This Model
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <strong>Provider:</strong> {{ config.provider.title() }}<br>
+                                    <strong>Model:</strong> {{ config.model_name }}<br>
+                                    <strong>Endpoint:</strong> {{ config.endpoint_url }}
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Max Tokens:</strong> {{ config.max_tokens }}<br>
+                                    <strong>Temperature:</strong> {{ config.temperature }}<br>
+                                    <strong>Status:</strong> 
+                                    {% if config.enabled %}
+                                        <span class="badge badge-success">Enabled</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">Disabled</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- Test Results Area -->
+                            <div id="test-result-{{ model_key }}" class="mt-3" style="display: none;">
+                                <div class="alert" id="test-alert-{{ model_key }}"></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    <!-- Setup Instructions -->
+                    <div class="mt-4">
+                        <h5>Setup Instructions</h5>
+                        
+                        <div class="accordion" id="setupAccordion">
+                            <!-- Ollama Setup -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h2 class="mb-0">
+                                        <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#ollamaSetup">
+                                            🏠 Ollama Setup (Recommended - Free & Local)
+                                        </button>
+                                    </h2>
+                                </div>
+                                <div id="ollamaSetup" class="collapse show" data-parent="#setupAccordion">
+                                    <div class="card-body">
+                                        <h6>1. Install Ollama</h6>
+                                        <div class="alert alert-info">
+                                            <strong>Windows + WSL2 Users:</strong> Install Ollama on Windows, then use port forwarding as shown below.
+                                        </div>
+                                        
+                                        <strong>Windows:</strong> <a href="https://ollama.ai/download" target="_blank">Download installer</a><br>
+                                        <strong>Linux/Mac:</strong> <code>curl -fsSL https://ollama.ai/install.sh | sh</code>
+                                        
+                                        <h6 class="mt-3">2. Windows + WSL2 Setup (Port Forwarding)</h6>
+                                        <div class="alert alert-warning">
+                                            <strong>🪟 Windows Users:</strong> If using Docker in WSL2, run this in Windows PowerShell as Administrator:
+                                            <br><br>
+                                            <code>netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=11434 connectaddress=127.0.0.1 connectport=11434</code>
+                                            <br><br>
+                                            This forwards Ollama from Windows to WSL2 so Docker containers can access it.
+                                            <br><br>
+                                            <strong>Troubleshooting:</strong>
+                                            <ul class="mb-0">
+                                                <li>Make sure Ollama is running on Windows</li>
+                                                <li>Check Windows Firewall allows port 11434</li>
+                                                <li>Test with: <code>curl http://host.docker.internal:11434/api/tags</code></li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <h6 class="mt-3">3. Pull Models (Examples)</h6>
+                                        <code>ollama pull llama3.1:8b</code><br>
+                                        <code>ollama pull mistral:7b</code><br>
+                                        <code>ollama pull codellama:7b</code><br>
+                                        <code>ollama pull qwen2.5:7b</code><br>
+                                        <code>ollama pull phi3.5:3.8b</code>
+                                        
+                                        <h6 class="mt-3">4. Start Ollama Server</h6>
+                                        <strong>Windows:</strong> Ollama starts automatically after installation<br>
+                                        <strong>Linux/Mac:</strong> <code>ollama serve</code>
+                                        
+                                        <h6 class="mt-3">5. Refresh Available Models</h6>
+                                        <p>After pulling new models, click the "🔄 Refresh Ollama Models" button above to discover all available models automatically.</p>
+                                        
+                                        <h6 class="mt-3">6. Alternative Endpoints</h6>
+                                        <p>If auto-discovery doesn't work, set the <code>OLLAMA_ENDPOINT</code> environment variable:</p>
+                                        <code>OLLAMA_ENDPOINT=http://your-ollama-host:11434</code>
+                                        
+                                        <div class="alert alert-info mt-3">
+                                            <strong>💡 Benefits:</strong>
+                                            <ul class="mb-0">
+                                                <li>Completely free - no API costs</li>
+                                                <li>Privacy - data stays on your server</li>
+                                                <li>Fast responses once models are loaded</li>
+                                                <li>Works offline</li>
+                                                <li><strong>Auto-discovery:</strong> All available models are discovered automatically</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- OpenAI Setup -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h2 class="mb-0">
+                                        <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#openaiSetup">
+                                            🌐 OpenAI Setup (API Required)
+                                        </button>
+                                    </h2>
+                                </div>
+                                <div id="openaiSetup" class="collapse" data-parent="#setupAccordion">
+                                    <div class="card-body">
+                                        <h6>1. Get API Key</h6>
+                                        <p>Sign up at <a href="https://platform.openai.com" target="_blank">platform.openai.com</a></p>
+                                        
+                                        <h6>2. Add to Environment</h6>
+                                        <code>OPENAI_API_KEY=your_api_key_here</code>
+                                        
+                                        <div class="alert alert-warning mt-3">
+                                            <strong>💰 Costs:</strong>
+                                            <ul class="mb-0">
+                                                <li>GPT-4o-mini: ~$0.15/1M tokens</li>
+                                                <li>GPT-4: ~$5/1M tokens</li>
+                                                <li>Estimated ~$7.50/month for 50 events</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Anthropic Setup -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h2 class="mb-0">
+                                        <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#anthropicSetup">
+                                            🧠 Anthropic Setup (API Required)
+                                        </button>
+                                    </h2>
+                                </div>
+                                <div id="anthropicSetup" class="collapse" data-parent="#setupAccordion">
+                                    <div class="card-body">
+                                        <h6>1. Get API Key</h6>
+                                        <p>Sign up at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></p>
+                                        
+                                        <h6>2. Add to Environment</h6>
+                                        <code>ANTHROPIC_API_KEY=your_api_key_here</code>
+                                        
+                                        <div class="alert alert-info mt-3">
+                                            <strong>💡 Claude Features:</strong>
+                                            <ul class="mb-0">
+                                                <li>Excellent reasoning capabilities</li>
+                                                <li>Good tool calling support</li>
+                                                <li>Similar pricing to OpenAI</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Function Calling Info -->
+                        <div class="alert alert-info mt-4">
+                            <h6><strong>🔧 Function Calling Capability</strong></h6>
+                            <p class="mb-2">The AI event creation system relies on <strong>function calling</strong> to:</p>
+                            <ul class="mb-2">
+                                <li>Create event drafts from natural language</li>
+                                <li>Check date and venue availability</li>
+                                <li>Set pricing and capacity limits</li>
+                                <li>Configure notifications and reminders</li>
+                            </ul>
+                            <p class="mb-2">
+                                <strong>Test Results:</strong> When you test a model above, both basic chat and function calling 
+                                capabilities are tested. Models with ✅ function calling will provide the best event creation experience.
+                            </p>
+                            <p class="mb-0">
+                                <strong>Provider Differences:</strong>
+                                <ul class="mb-0">
+                                    <li><strong>🌐 OpenAI & 🧠 Anthropic:</strong> Native structured function calling support</li>
+                                    <li><strong>🏠 Ollama:</strong> Text-based function calling (may vary by model)</li>
+                                    <li><strong>⚡ Performance:</strong> Model loading time depends on size and hardware</li>
+                                    <li><strong>🖥️ Hardware Note:</strong> With RTX 3090 (24GB VRAM) + 128GB RAM, large models (13B-34B) load in 10-45 seconds</li>
+                                </ul>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Track active test controllers for cancellation
+const activeTests = {};
+
+function cancelTest(modelKey) {
+    if (activeTests[modelKey]) {
+        activeTests[modelKey].abort();
+        delete activeTests[modelKey];
+        
+        // Update UI
+        const testButton = document.getElementById(`test-btn-${modelKey}`);
+        const cancelButton = document.getElementById(`cancel-btn-${modelKey}`);
+        const resultDiv = document.getElementById(`test-result-${modelKey}`);
+        const alertDiv = document.getElementById(`test-alert-${modelKey}`);
+        
+        testButton.textContent = 'Test';
+        testButton.disabled = false;
+        cancelButton.style.display = 'none';
+        
+        if (resultDiv && alertDiv) {
+            resultDiv.style.display = 'block';
+            alertDiv.className = 'alert alert-warning';
+            alertDiv.innerHTML = `
+                <strong>⚠️ Test Cancelled by User</strong><br>
+                <small>Test was stopped before completion.</small>
+            `;
+        }
+    }
+}
+
+async function setCurrentModel(modelKey) {
+    try {
+        const formData = new FormData();
+        formData.append('model_key', modelKey);
+        formData.append('csrf_token', '{{ csrf_token }}');
+        
+        const response = await fetch('/admin/ai-models/set-current', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            location.reload(); // Refresh to show new active model
+        } else {
+            alert('Failed to set model: ' + data.message);
+        }
+    } catch (error) {
+        alert('Error setting model: ' + error.message);
+    }
+}
+
+async function testModel(modelKey) {
+    const testButton = document.getElementById(`test-btn-${modelKey}`);
+    const cancelButton = document.getElementById(`cancel-btn-${modelKey}`);
+    const originalText = testButton.textContent;
+    testButton.disabled = true;
+    
+    // Show cancel button, hide test button
+    cancelButton.style.display = 'inline-block';
+    
+    // Create abort controller for this test
+    const controller = new AbortController();
+    activeTests[modelKey] = controller;
+    
+    const resultDiv = document.getElementById(`test-result-${modelKey}`);
+    const alertDiv = document.getElementById(`test-alert-${modelKey}`);
+    
+    // Show initial progress with real-time timer
+    let startTime = Date.now();
+    let progressInterval;
+    
+    function updateProgress() {
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        const isOllama = modelKey.toLowerCase().includes('ollama');
+        
+        testButton.textContent = `Testing... (${elapsed}s)`;
+        
+        if (resultDiv && alertDiv) {
+            resultDiv.style.display = 'block';
+            alertDiv.className = 'alert alert-info';
+            
+            const loadingMessage = isOllama ? 
+                'Model loading into VRAM... This may take 10-30 seconds for larger models.' : 
+                'Testing model capabilities...';
+                
+            alertDiv.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <div class="spinner-border spinner-border-sm me-3" role="status" aria-hidden="true"></div>
+                    <div>
+                        <strong>🧪 Testing model (${elapsed}s elapsed)</strong><br>
+                        <small class="text-muted">${loadingMessage}</small>
+                        ${isOllama ? '<br><small class="text-muted">💡 First load takes longer as model loads into your 3090\'s VRAM</small>' : ''}
+                    </div>
+                </div>
+            `;
+        }
+    }
+    
+    // Start progress updates
+    updateProgress();
+    progressInterval = setInterval(updateProgress, 1000);
+    
+    try {
+        const formData = new FormData();
+        formData.append('csrf_token', '{{ csrf_token }}');
+        
+        const response = await fetch(`/admin/ai-models/${modelKey}/test`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+            signal: controller.signal
+        });
+        
+        const data = await response.json();
+        
+        // Clear progress interval and cleanup test tracking
+        clearInterval(progressInterval);
+        if (activeTests[modelKey]) {
+            delete activeTests[modelKey];
+        }
+        
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            alertDiv.className = 'alert alert-success';
+            const totalTime = data.loading_time || 'N/A';
+            const endpoint = data.endpoint || 'N/A';
+            const testsPassedInfo = data.tests_passed ? `<br><strong>Tests Passed:</strong> ${data.tests_passed.join(', ')}` : '';
+            const endpointInfo = data.endpoint_used ? `<br><strong>Endpoint Used:</strong> ${data.endpoint_used}` : '';
+            
+            alertDiv.innerHTML = `
+                <strong>✅ Test Successful (Time: ${totalTime})</strong><br>
+                <strong>Provider:</strong> ${data.provider || 'Unknown'}<br>
+                <strong>Model:</strong> ${data.model || modelKey}<br>
+                ${endpointInfo}
+                ${testsPassedInfo}
+                ${data.chat_test ? `<br><strong>Chat Test:</strong> ${data.chat_test}` : ''}
+                ${data.function_test ? `<br><strong>Function Calling:</strong> ${data.function_test}` : ''}
+                ${data.sample_response ? `<br><strong>Sample Response:</strong> "${data.sample_response}"` : ''}
+                ${data.response_preview ? `<br><strong>Response Preview:</strong> "${data.response_preview}"` : ''}
+                ${data.available_models_count ? `<br><strong>Available Models:</strong> ${data.available_models_count} total` : ''}
+                ${data.queue_size !== undefined ? `<br><strong>Queue Size:</strong> ${data.queue_size}` : ''}
+            `;
+        } else {
+            alertDiv.className = 'alert alert-danger';
+            const totalTime = data.loading_time || data.elapsed || 'N/A';
+            const levelFailed = data.level_failed ? ` (Failed at: ${data.level_failed})` : '';
+            const testsPassedInfo = data.tests_passed ? `<br><strong>Tests Passed:</strong> ${data.tests_passed.join(', ')} before failure` : '';
+            
+            alertDiv.innerHTML = `
+                <strong>❌ Test Failed${levelFailed} (Time: ${totalTime})</strong><br>
+                <strong>Error:</strong> ${data.error}<br>
+                ${data.details ? `<strong>Details:</strong> ${data.details}<br>` : ''}
+                ${testsPassedInfo}
+                ${data.chat_test ? `<strong>Chat Test:</strong> ${data.chat_test}<br>` : ''}
+                ${data.function_test ? `<strong>Function Calling:</strong> ${data.function_test}<br>` : ''}
+                ${data.raw_response ? `<strong>Raw Response:</strong> ${data.raw_response.substring(0, 200)}...<br>` : ''}
+                ${data.available_models && data.available_models.length > 0 ? `<strong>Available Models:</strong> ${data.available_models.slice(0, 3).join(', ')}${data.available_models.length > 3 ? '...' : ''}<br>` : ''}
+                <div class="mt-3 p-3 bg-light rounded">
+                    <h6 class="text-primary">💡 Troubleshooting Tips:</h6>
+                    <ul class="mb-0 small">
+                        ${data.level_failed === 'connection' ? 
+                            `<li><strong>Connection Failed:</strong> Check if Ollama is running and accessible at ${data.endpoint || 'the configured endpoint'}</li>
+                             <li><strong>Docker/WSL2:</strong> Verify port forwarding and host.docker.internal connectivity</li>
+                             <li><strong>Firewall:</strong> Ensure port 11434 is open and Windows Firewall allows connections</li>` : 
+                        data.level_failed === 'model_availability' ? 
+                            `<li><strong>Model Not Found:</strong> Download the model with <code>ollama pull ${modelKey.replace('ollama_', '').replace('_', ':')}</code></li>
+                             <li><strong>Model Names:</strong> Check exact model name with <code>ollama list</code></li>` :
+                        data.level_failed === 'simple_generation' ? 
+                            `<li><strong>Generation Failed:</strong> Model may be corrupted or incompatible</li>
+                             <li><strong>Memory Issues:</strong> Model may be too large for available VRAM (you have 24GB RTX 3090)</li>
+                             <li><strong>Loading Time:</strong> Large models can take 20-45 seconds to load initially</li>` :
+                        data.level_failed === 'chat_generation' ? 
+                            `<li><strong>Chat Format Issues:</strong> Model may not support chat format properly</li>
+                             <li><strong>Context Length:</strong> Try with shorter prompts or different model</li>` :
+                            `<li><strong>Ollama Models:</strong> Ensure model is downloaded (<code>ollama pull ${modelKey.replace('ollama_', '').replace('_', ':')}</code>)</li>
+                             <li><strong>Loading Time:</strong> Large models (13B+) can take 20-45 seconds to load into your 3090's 24GB VRAM</li>
+                             <li><strong>Memory:</strong> With 128GB RAM, you can run multiple large models, but VRAM is the bottleneck</li>
+                             <li><strong>Network:</strong> Check Docker networking and firewall settings</li>
+                             <li><strong>Service:</strong> Verify Ollama service is running on Windows host</li>`
+                        }
+                    </ul>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        clearInterval(progressInterval);
+        
+        if (error.name === 'AbortError') {
+            // Test was cancelled - UI already updated by cancelTest function
+            return;
+        }
+        
+        resultDiv.style.display = 'block';
+        alertDiv.className = 'alert alert-danger';
+        alertDiv.innerHTML = `
+            <strong>❌ Network/Connection Error</strong><br>
+            ${error.message}<br>
+            <div class="mt-2 p-3 bg-light rounded">
+                <h6 class="text-primary">🔧 Quick Checks:</h6>
+                <ul class="mb-0 small">
+                    <li>Verify Docker can reach <code>host.docker.internal:11434</code></li>
+                    <li>Check Windows port forwarding: <code>netsh interface portproxy show v4tov4</code></li>
+                    <li>Ensure Ollama service is running on Windows host</li>
+                    <li>Test directly: <code>curl http://localhost:11434/api/tags</code></li>
+                </ul>
+            </div>
+        `;
+    } finally {
+        // Clean up test tracking and UI
+        if (activeTests[modelKey]) {
+            delete activeTests[modelKey];
+        }
+        if (progressInterval) clearInterval(progressInterval);
+        testButton.textContent = originalText;
+        testButton.disabled = false;
+        cancelButton.style.display = 'none';
+    }
+}
+
+async function refreshOllamaModels() {
+    const refreshButton = event.target;
+    const originalText = refreshButton.textContent;
+    refreshButton.textContent = '🔄 Refreshing...';
+    refreshButton.disabled = true;
+    
+    try {
+        const formData = new FormData();
+        formData.append('csrf_token', '{{ csrf_token }}');
+        
+        const response = await fetch('/admin/ai-models/refresh-ollama', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Show success message
+            const successDiv = document.createElement('div');
+            successDiv.className = 'alert alert-success alert-dismissible fade show mt-3';
+            successDiv.innerHTML = `
+                <strong>✅ Success!</strong> ${data.message}
+                <button type="button" class="close" data-dismiss="alert">
+                    <span>&times;</span>
+                </button>
+            `;
+            refreshButton.parentNode.appendChild(successDiv);
+            
+            // Reload page after 2 seconds to show new models
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        } else {
+            // Show error message
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'alert alert-warning alert-dismissible fade show mt-3';
+            errorDiv.innerHTML = `
+                <strong>⚠️ Warning:</strong> ${data.message || data.error}
+                <button type="button" class="close" data-dismiss="alert">
+                    <span>&times;</span>
+                </button>
+            `;
+            refreshButton.parentNode.appendChild(errorDiv);
+        }
+        
+    } catch (error) {
+        // Show error message
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
+        errorDiv.innerHTML = `
+            <strong>❌ Error:</strong> ${error.message}
+            <button type="button" class="close" data-dismiss="alert">
+                <span>&times;</span>
+            </button>
+        `;
+        refreshButton.parentNode.appendChild(errorDiv);
+    } finally {
+        refreshButton.textContent = originalText;
+        refreshButton.disabled = false;
+    }
+}
+
+// Load endpoint info on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadEndpointInfo();
+});
+
+async function loadEndpointInfo() {
+    try {
+        const response = await fetch('/api/ai/models/available', {
+            credentials: 'same-origin'
+        });
+        const data = await response.json();
+        if (data.ollama_endpoint) {
+            document.getElementById('ollama-endpoint').textContent = data.ollama_endpoint;
+        } else {
+            document.getElementById('ollama-endpoint').textContent = 'http://host.docker.internal:11434 (default)';
+        }
+    } catch (error) {
+        document.getElementById('ollama-endpoint').textContent = 'http://host.docker.internal:11434 (default)';
+    }
+}
+
+async function testDynamicConnection() {
+    const testButton = document.getElementById('dynamic-test-btn');
+    const resultDiv = document.getElementById('dynamic-test-result');
+    const alertDiv = document.getElementById('dynamic-test-alert');
+    
+    const originalText = testButton.textContent;
+    testButton.textContent = '🔗 Testing...';
+    testButton.disabled = true;
+    
+    try {
+        const response = await fetch('/api/ai/test-dynamic-connection', {
+            method: 'POST',
+            credentials: 'same-origin'
+        });
+        
+        const data = await response.json();
+        
+        resultDiv.style.display = 'block';
+        
+        if (data.success && data.results.full_flow_success) {
+            alertDiv.className = 'alert alert-success';
+            alertDiv.innerHTML = `
+                <strong>✅ Dynamic Connection Test PASSED!</strong><br>
+                <strong>Full Flow:</strong> AI Tool Creation → Draft Management → Event API ✅<br><br>
+                <strong>Results:</strong><br>
+                • AI Response Type: ${data.results.ai_response_type}<br>
+                • Tools Used: ${data.results.has_tool_results ? '✅ Yes' : '❌ No'}<br>
+                • Draft Created: ${data.results.draft_created ? '✅ Yes' : '❌ No'}<br>
+                • Event Created: ${data.results.event_created ? '✅ Yes' : '❌ No'}<br>
+                ${data.results.draft_title ? `• Draft Title: "${data.results.draft_title}"<br>` : ''}
+                <br><strong>AI Response Preview:</strong><br>
+                <div class="bg-light p-2 rounded mt-2 small">${data.ai_response}</div>
+            `;
+        } else if (data.success) {
+            alertDiv.className = 'alert alert-warning';
+            alertDiv.innerHTML = `
+                <strong>⚠️ Dynamic Connection Test PARTIAL</strong><br>
+                <strong>Issue:</strong> ${!data.results.has_tool_results ? 'AI not using tools' : 
+                                       !data.results.draft_created ? 'Draft creation failed' :
+                                       !data.results.api_connection ? 'API connection failed' : 'Unknown issue'}<br><br>
+                <strong>Results:</strong><br>
+                • AI Response Type: ${data.results.ai_response_type}<br>
+                • Tools Used: ${data.results.has_tool_results ? '✅ Yes' : '❌ No'}<br>
+                • Draft Created: ${data.results.draft_created ? '✅ Yes' : '❌ No'}<br>
+                • API Connection: ${data.results.api_connection ? '✅ Yes' : '❌ No'}<br>
+                • Event Created: ${data.results.event_created ? '✅ Yes' : '❌ No'}<br>
+                <br><strong>AI Response Preview:</strong><br>
+                <div class="bg-light p-2 rounded mt-2 small">${data.ai_response}</div>
+                <br><div class="alert alert-info mt-3">
+                    <strong>💡 This suggests the screenshot issue is likely resolved:</strong><br>
+                    The AI is now properly connected to tools and can create events!
+                </div>
+            `;
+        } else {
+            alertDiv.className = 'alert alert-danger';
+            alertDiv.innerHTML = `
+                <strong>❌ Dynamic Connection Test FAILED</strong><br>
+                <strong>Error:</strong> ${data.error}<br>
+                <strong>Message:</strong> ${data.message}<br>
+                <div class="mt-3 p-3 bg-light rounded">
+                    <h6 class="text-primary">🔧 Troubleshooting:</h6>
+                    <ul class="mb-0 small">
+                        <li>Ensure AI model is properly configured and responding</li>
+                        <li>Check that dynamic integration classes are properly imported</li>
+                        <li>Verify database connections are working</li>
+                        <li>Test individual model functionality first</li>
+                    </ul>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        alertDiv.className = 'alert alert-danger';
+        alertDiv.innerHTML = `
+            <strong>❌ Connection Error</strong><br>
+            ${error.message}<br>
+            <div class="mt-2 p-3 bg-light rounded">
+                <h6 class="text-primary">🔧 Quick Checks:</h6>
+                <ul class="mb-0 small">
+                    <li>Verify the application is running properly</li>
+                    <li>Check browser console for additional errors</li>
+                    <li>Ensure you have proper admin permissions</li>
+                </ul>
+            </div>
+        `;
+    } finally {
+        testButton.textContent = originalText;
+        testButton.disabled = false;
+    }
+}
+</script>
+
+<!-- Bootstrap JS for accordion functionality -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+
+{% endblock %} 

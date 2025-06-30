@@ -13,17 +13,29 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 # Install any dependencies specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt alembic
+RUN pip install --no-cache-dir -r requirements.txt alembic pytest pytest-asyncio
 
 # Copy the rest of the application code into the container at /app
 COPY . .
 
-# Make port 8000 available to the world outside this container
-EXPOSE 8000
+# Create test results directory
+RUN mkdir -p /app/test_results
 
 # Define environment variable
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
+
+# Conditionally run tests during build based on environment variable
+# Tests are only run if RUN_TESTS_ON_BUILD is set to "true"
+RUN if [ "${RUN_TESTS_ON_BUILD:-false}" = "true" ]; then \
+        echo "🧪 Running tests during Docker build..."; \
+        python docker_test_runner.py || echo "⚠️  Tests completed with issues - check test_results/ for details"; \
+    else \
+        echo "⏭️  Skipping tests during build (RUN_TESTS_ON_BUILD=${RUN_TESTS_ON_BUILD})"; \
+    fi
+
+# Make port 8000 available to the world outside this container
+EXPOSE 8000
 
 # For development, use --reload for live updates
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

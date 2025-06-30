@@ -1,0 +1,446 @@
+{
+  "routes": {
+    "/": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/events": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/load-message": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/signup": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/confirm-email/{token}": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/login": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/logout": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/health": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/debug/session": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/auth/facebook": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/auth/facebook/callback": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/auth/google": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/auth/google/callback": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/auth/complete": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/admin/events/new": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/event/{event_id}": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/admin/users": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/admin/users/promote": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/profile": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/cancel-booking": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/event/{event_id}/book": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/resend-confirmation": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/admin": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/admin/events": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/admin/events/{event_id}/delete": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/admin/payments": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/admin/payments/{booking_id}/refund": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/admin/payments/manual-refund": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/admin/stats": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/admin/stripe": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/admin/stripe/webhook-config": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/admin/stripe/test-webhook": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/admin/stripe/update-config": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/payment/success": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/payment/cancel": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/webhook/stripe": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/children": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/children/add": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/children/{child_id}/edit": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/children/{child_id}/delete": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/gallery": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/admin/gallery": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/admin/gallery/upload": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/admin/gallery/{image_id}/delete": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/admin/gallery/{image_id}/edit": {
+      "method": "post",
+      "file": "app/main.py"
+    },
+    "/admin/events/all": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/admin/events/calendar": {
+      "method": "get",
+      "file": "app/main.py"
+    },
+    "/admin/events/{event_id}/bookings": {
+      "method": "get",
+      "file": "app/main.py"
+    }
+  },
+  "imports": {
+    "app/ai_assistant.py": [
+      "app.event_draft_manager",
+      "re",
+      "app.ai_tools",
+      "sqlalchemy.orm",
+      "datetime",
+      "app.ai_providers",
+      "json",
+      "typing",
+      "logging"
+    ],
+    "app/database.py": [
+      "sqlalchemy.engine.url",
+      "sqlalchemy",
+      "sqlalchemy.orm",
+      "os"
+    ],
+    "app/main.py": [
+      "starlette.middleware.base",
+      "app.config",
+      "requests",
+      "app.ai.router",
+      "sqlalchemy.exc",
+      "starlette.middleware.sessions",
+      "itsdangerous",
+      "slowapi",
+      "fastapi",
+      "datetime",
+      "uuid",
+      "slowapi.util",
+      "fastapi.templating",
+      "typing",
+      "shutil",
+      "fastapi.staticfiles",
+      "authlib.integrations.starlette_client",
+      "traceback",
+      "sqlalchemy.orm",
+      "app.main",
+      "starlette.status",
+      "sqlalchemy",
+      "logging",
+      "smtplib",
+      "slowapi.errors",
+      "app.models",
+      "fastapi.responses",
+      "app.database",
+      "json",
+      "passlib.context",
+      "app.payment_service",
+      "os",
+      "email.mime.text"
+    ],
+    "app/models.py": [
+      "enum",
+      "sqlalchemy.ext.declarative",
+      "sqlalchemy.orm",
+      "datetime",
+      "sqlalchemy.sql",
+      "sqlalchemy"
+    ],
+    "app/ai_agent.py": [
+      "sqlalchemy.exc",
+      "enum",
+      "app.models",
+      "sqlalchemy",
+      "traceback",
+      "sqlalchemy.orm",
+      "datetime",
+      "app.ai_tools",
+      "uuid",
+      "json",
+      "app.ai_providers",
+      "time",
+      "app.database",
+      "typing",
+      "functools",
+      "asyncio",
+      "logging"
+    ],
+    "app/payment_service.py": [
+      "app.models",
+      "sqlalchemy.orm",
+      "stripe",
+      "app.config",
+      "typing",
+      "logging"
+    ],
+    "app/config.py": [
+      "typing",
+      "dotenv",
+      "os"
+    ],
+    "app/ai_tools.py": [
+      "app.models",
+      "sqlalchemy.orm",
+      "datetime",
+      "app.database",
+      "json",
+      "typing",
+      "sqlalchemy"
+    ],
+    "app/ai_providers.py": [
+      "httpx",
+      "openai",
+      "dataclasses",
+      "abc",
+      "re",
+      "datetime",
+      "anthropic",
+      "json",
+      "time",
+      "os",
+      "typing",
+      "asyncio",
+      "logging"
+    ],
+    "app/event_draft_manager.py": [
+      "app.models",
+      "sqlalchemy.orm",
+      "datetime",
+      "app.ai_tools",
+      "json",
+      "typing",
+      "sqlalchemy.exc",
+      "logging"
+    ],
+    "app/models/comprehensive_event.py": [
+      "enum",
+      "models",
+      "sqlalchemy.orm",
+      "datetime",
+      "dateutil.parser",
+      "uuid",
+      "os",
+      "typing",
+      "sqlalchemy",
+      "sys"
+    ],
+    "app/ai/router.py": [
+      "schemas.health",
+      "schemas.chat",
+      "app.models",
+      "fastapi",
+      "sqlalchemy.orm",
+      "fastapi.responses",
+      "app.database",
+      "services",
+      "dependencies",
+      "typing",
+      "logging"
+    ],
+    "app/ai/dependencies.py": [
+      "app.models",
+      "fastapi",
+      "sqlalchemy.orm",
+      "app.main",
+      "app.database",
+      "app.ai_providers",
+      "typing",
+      "sqlalchemy",
+      "logging"
+    ],
+    "app/ai/__init__.py": [
+      "router",
+      "dependencies"
+    ],
+    "app/ai/services/model_service.py": [
+      "app.event_draft_manager",
+      "app.models",
+      "fastapi",
+      "traceback",
+      "sqlalchemy.orm",
+      "datetime",
+      "fastapi.templating",
+      "uuid",
+      "json",
+      "app.main",
+      "time",
+      "app.database",
+      "app.ai_assistant",
+      "typing",
+      "asyncio",
+      "logging"
+    ],
+    "app/ai/services/event_service.py": [
+      "app.event_draft_manager",
+      "app.models",
+      "fastapi",
+      "traceback",
+      "sqlalchemy.orm",
+      "app.main",
+      "typing",
+      "logging"
+    ],
+    "app/ai/services/chat_service.py": [
+      "app.event_draft_manager",
+      "app.models",
+      "fastapi",
+      "traceback",
+      "sqlalchemy.orm",
+      "datetime",
+      "app.ai_agent",
+      "uuid",
+      "app.ai_assistant",
+      "typing",
+      "logging"
+    ],
+    "app/ai/services/__init__.py": [
+      "event_service",
+      "health_service",
+      "chat_service",
+      "model_service"
+    ],
+    "app/ai/services/health_service.py": [
+      "app.models",
+      "fastapi",
+      "traceback",
+      "sqlalchemy.orm",
+      "datetime",
+      "json",
+      "os",
+      "app.ai_assistant",
+      "typing",
+      "sqlalchemy",
+      "logging"
+    ],
+    "app/ai/agents/base.py": [
+      "enum",
+      "abc",
+      "sqlalchemy.orm",
+      "datetime",
+      "typing",
+      "logging"
+    ],
+    "app/ai/schemas/chat.py": [
+      "datetime",
+      "typing",
+      "pydantic",
+      "enum"
+    ],
+    "app/ai/schemas/health.py": [
+      "datetime",
+      "typing",
+      "pydantic",
+      "enum"
+    ]
+  },
+  "unused_files": [],
+  "file_count": 27
+}

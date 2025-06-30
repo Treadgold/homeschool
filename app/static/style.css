@@ -1,11 +1,381 @@
 /* Site-wide styles for LifeLearners.org.nz */
 
 body {
-    background: #f8f9fa;
-    color: #333;
+    background: #f7fafc;
+    color: #222;
     font-family: 'Segoe UI', Arial, sans-serif;
     margin: 0;
     padding: 0;
+}
+
+/* Header styles */
+header {
+    background: #2b6cb0;
+    color: #fff;
+    padding: 2rem 1rem 1rem 1rem;
+    text-align: center;
+}
+
+header h1 {
+    margin: 0 0 0.5rem 0;
+    font-size: 2.5rem;
+    letter-spacing: 1px;
+}
+
+header p {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+/* Main content container */
+main {
+    max-width: 700px;
+    margin: 2rem auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(44, 62, 80, 0.08);
+    padding: 2rem;
+}
+
+/* Desktop layout for admin and create event pages */
+@media (min-width: 1200px) {
+    body.desktop-admin main,
+    body.desktop-create-event main {
+        max-width: 95vw;
+        margin: 1rem auto;
+        padding: 1.5rem 2rem;
+    }
+    
+    body.desktop-admin header,
+    body.desktop-create-event header {
+        padding: 1.5rem 2rem 1rem 2rem;
+    }
+    
+    /* Make admin containers use full available width */
+    body.desktop-admin .admin-container,
+    body.desktop-admin .admin-grid,
+    body.desktop-admin .bookings-container,
+    body.desktop-admin .calendar-container {
+        max-width: none;
+    }
+    
+    /* Enhanced admin layouts for desktop */
+    body.desktop-admin .admin-stats {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    
+    body.desktop-admin .filters-grid {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    }
+    
+    body.desktop-admin .events-table,
+    body.desktop-admin .payments-table {
+        font-size: 0.9rem;
+    }
+    
+    body.desktop-admin .admin-header {
+        margin-bottom: 1.5rem;
+    }
+    
+    /* Enhanced create event layout for desktop */
+    body.desktop-create-event .main-flex {
+        max-width: none;
+        margin: 1rem 0;
+        gap: 3rem;
+    }
+    
+    body.desktop-create-event .form-container,
+    body.desktop-create-event .preview-container {
+        flex: 1;
+        min-width: 400px;
+    }
+    
+    /* AI Create Event desktop optimizations */
+    body.desktop-create-event .container-fluid {
+        max-width: none;
+        padding: 1rem 0;
+    }
+    
+    body.desktop-create-event .split-layout {
+        height: calc(100vh - 150px);
+        gap: 2rem;
+    }
+}
+
+@media (min-width: 1400px) {
+    body.desktop-admin main,
+    body.desktop-create-event main {
+        max-width: 1350px;
+        padding: 2rem 3rem;
+    }
+    
+    body.desktop-create-event .main-flex {
+        gap: 4rem;
+    }
+}
+
+/* Medium desktop screens */
+@media (min-width: 992px) and (max-width: 1199px) {
+    body.desktop-admin main,
+    body.desktop-create-event main {
+        max-width: 90vw;
+        margin: 1.5rem auto;
+    }
+    
+    body.desktop-admin header,
+    body.desktop-create-event header {
+        padding: 1.5rem 1.5rem 1rem 1.5rem;
+    }
+    
+    body.desktop-create-event .main-flex {
+        max-width: none;
+        margin: 1rem 0;
+        gap: 2rem;
+    }
+}
+
+/* Ensure mobile responsiveness is preserved */
+@media (max-width: 991px) {
+    /* Force remove desktop classes on mobile */
+    body.desktop-admin,
+    body.desktop-create-event {
+        /* Desktop classes are removed by JavaScript, but ensure layout falls back */
+    }
+    
+    body.desktop-admin main,
+    body.desktop-create-event main {
+        max-width: 700px;
+        margin: 2rem auto;
+        padding: 2rem;
+    }
+    
+    /* Hide desktop indicator on mobile */
+    .desktop-indicator {
+        display: none !important;
+    }
+}
+
+/* Button styles */
+.cta {
+    display: inline-block;
+    margin-top: 1.5rem;
+    background: #2b6cb0;
+    color: #fff;
+    padding: 0.7rem 1.5rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: background 0.2s;
+    border: none;
+    cursor: pointer;
+}
+
+.cta:hover {
+    background: #224e7a;
+}
+
+.cta.cta-light {
+    background: #fff;
+    color: #2b6cb0;
+}
+
+.cta.cta-light:hover {
+    background: #e2e8f0;
+}
+
+.cta.cta-admin {
+    background: #d53f8c;
+}
+
+.cta.cta-admin:hover {
+    background: #b83280;
+}
+
+.cta-ai {
+    background: #8b5cf6;
+}
+
+.cta-ai:hover {
+    background: #7c3aed;
+}
+
+.cta-ai-models {
+    background: #6b46c1;
+}
+
+.cta-ai-models:hover {
+    background: #553c9a;
+}
+
+.cta-profile {
+    background: #38a169;
+}
+
+.cta-profile:hover {
+    background: #2f855a;
+}
+
+.cta-signup {
+    background: #d69e2e;
+}
+
+.cta-signup:hover {
+    background: #b7791f;
+}
+
+.nav-spacing {
+    margin-right: 0.7rem;
+}
+
+.nav-top-margin {
+    margin-top: 1.5rem;
+}
+
+/* Utility Classes for Common Inline Styles */
+.text-center {
+    text-align: center;
+}
+
+.text-muted {
+    color: #6c757d;
+}
+
+.text-danger {
+    color: #e53e3e;
+}
+
+.text-primary {
+    color: #2b6cb0;
+}
+
+.text-success {
+    color: #28a745;
+}
+
+.inline-form {
+    display: inline;
+}
+
+.inline-block {
+    display: inline-block;
+}
+
+.hidden {
+    display: none;
+}
+
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+.ml-1 { margin-left: 0.5rem; }
+.ml-2 { margin-left: 1rem; }
+
+.p-1 { padding: 0.5rem; }
+.p-2 { padding: 1rem; }
+.p-3 { padding: 1.5rem; }
+
+.bg-light {
+    background: #f8f9fa;
+}
+
+.bg-info {
+    background: #e8f4fd;
+}
+
+.border-left-primary {
+    border-left: 4px solid #2b6cb0;
+}
+
+.rounded {
+    border-radius: 8px;
+}
+
+.w-100 {
+    width: 100%;
+}
+
+.gap-1 {
+    gap: 0.5rem;
+}
+
+.flex {
+    display: flex;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.justify-center {
+    justify-content: center;
+}
+
+.align-center {
+    align-items: center;
+}
+
+.flex-wrap {
+    flex-wrap: wrap;
+}
+
+.profile-info-box {
+    background: #e8f4fd;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.profile-picture {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.tips-box {
+    background: #e8f4fd;
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid #2b6cb0;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #6c757d;
+}
+
+.form-grid {
+    display: grid;
+    gap: 1rem;
+    max-width: 500px;
+}
+
+.capacity-bar {
+    background: #e2e8f0;
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+}
+
+.capacity-fill {
+    background: #38a169;
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.capacity-fill.warning {
+    background: #d69e2e;
+}
+
+.capacity-fill.danger {
+    background: #e53e3e;
 }
 
 .main-flex {

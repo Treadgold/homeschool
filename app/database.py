@@ -7,3 +7,11 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:pass@db:5432/homesch
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine) 
+
+def get_db():
+    """Database dependency for FastAPI"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close() 

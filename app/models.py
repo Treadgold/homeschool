@@ -1,8 +1,9 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Numeric, Boolean, ForeignKey, Float, func
+from sqlalchemy import Column, Integer, String, Text, DateTime, Numeric, Boolean, ForeignKey, Float, func, JSON, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import datetime
+import enum
 
 Base = declarative_base()
 
@@ -43,6 +44,7 @@ class User(Base):
     auth_provider = Column(String(20), default='email')  # 'email', 'facebook', 'google'
     
     children = relationship("Child", back_populates="user")
+    chat_conversations = relationship("ChatConversation", back_populates="user")
 
 class Child(Base):
     __tablename__ = "children"
@@ -78,4 +80,73 @@ class GalleryImage(Base):
     filename = Column(String(255), nullable=False)
     title = Column(String(200), nullable=True)
     description = Column(Text, nullable=True)
-    upload_date = Column(DateTime, default=func.now()) 
+    upload_date = Column(DateTime, default=func.now())
+
+class AgentStatus(enum.Enum):
+    """Agent status enumeration"""
+    idle = "idle"
+    thinking = "thinking"
+    using_tool = "using_tool"
+    planning = "planning"
+    waiting = "waiting"
+    error = "error"
+
+class ChatConversation(Base):
+    """Persistent chat conversations"""
+    __tablename__ = "chat_conversations"
+    
+    id = Column(String(36), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String(200), nullable=True)  # Auto-generated from first message
+    status = Column(String(20), default="active")  # active, completed, archived
+    agent_context = Column(JSON, nullable=True)  # Agent memory and state
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="chat_conversations")
+    messages = relationship("ChatMessage", back_populates="conversation", cascade="all, delete-orphan")
+
+class ChatMessage(Base):
+    """Individual messages in conversations"""
+    __tablename__ = "chat_messages"
+    
+    id = Column(Integer, primary_key=True)
+    conversation_id = Column(String(36), ForeignKey("chat_conversations.id"), nullable=False)
+    role = Column(String(20), nullable=False)  # user, assistant, system, tool
+    content = Column(Text, nullable=False)
+    msg_metadata = Column(JSON, nullable=True)  # Tool calls, timing, etc.
+    agent_status = Column(Enum(AgentStatus, name="agent_status"), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    
+    # Relationships
+    conversation = relationship("ChatConversation", back_populates="messages")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "conversation_id": self.conversation_id,
+            "role": self.role,
+            "content": self.content,
+            "msg_metadata": self.msg_metadata,
+            "agent_status": self.agent_status.value if self.agent_status else None,
+            "created_at": self.created_at.isoformat()
+        }
+
+class AgentSession(Base):
+    """Agent session state for complex workflows"""
+    __tablename__ = "agent_sessions"
+    
+    id = Column(String(36), primary_key=True)
+    conversation_id = Column(String(36), ForeignKey("chat_conversations.id"), nullable=False)
+    agent_type = Column(String(50), default="event_creator")  # event_creator, planner, assistant
+    current_step = Column(String(100), nullable=True)
+    plan = Column(JSON, nullable=True)  # Agent's current plan
+    memory = Column(JSON, nullable=True)  # Working memory
+    tools_used = Column(JSON, nullable=True)  # History of tool usage
+    status = Column(Enum(AgentStatus, name="agent_status"), default=AgentStatus.idle)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    conversation = relationship("ChatConversation") 

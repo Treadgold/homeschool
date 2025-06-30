@@ -1,0 +1,27 @@
+{
+  "timestamp": "2025-06-30T14:17:46.972305",
+  "overall_success": false,
+  "results": {
+    "unit_tests": {
+      "success": false,
+      "exit_code": 4,
+      "elapsed": 0.8349668979644775,
+      "stdout": "",
+      "stderr": "ImportError while loading conftest '/home/mike/code/homeschool/tests/conftest.py'.\ntests/conftest.py:15: in <module>\n    from app.database import Base, get_db\nE   ImportError: cannot import name 'Base' from 'app.database' (/home/mike/code/homeschool/app/database.py)\n"
+    },
+    "function_calling": {
+      "success": true,
+      "exit_code": 0,
+      "elapsed": 0.6448993682861328,
+      "stdout": "\ud83e\uddea Testing Ollama Function Calling - 14:17:35\nTarget: http://host.docker.internal:11434\nModel: devstral:latest\n============================================================\n\ud83d\udccb Payload:\n{\n  \"model\": \"devstral:latest\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Please call the test_function_call function with message='Function calling works!' and status='success'\"\n    }\n  ],\n  \"stream\": false,\n  \"tools\": [\n    {\n      \"type\": \"function\",\n      \"function\": {\n        \"name\": \"test_function_call\",\n        \"description\": \"A simple test function to verify function calling works\",\n        \"parameters\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"message\": {\n              \"type\": \"string\",\n              \"description\": \"A test message to return\"\n            },\n            \"status\": {\n              \"type\": \"string\",\n              \"enum\": [\n                \"success\",\n                \"error\"\n              ],\n              \"description\": \"Status of the test\"\n            }\n          },\n          \"required\": [\n            \"message\",\n            \"status\"\n          ]\n        }\n      }\n    }\n  ]\n}\n\n============================================================\n\ud83d\ude80 Sending function calling request...\n\u274c Connection failed - is Ollama running?\n\ud83d\udca1 Make sure Ollama is accessible at http://host.docker.internal:11434\n",
+      "stderr": ""
+    },
+    "ai_agent": {
+      "success": true,
+      "exit_code": 0,
+      "elapsed": 11.269416809082031,
+      "stdout": "\ud83e\uddea Testing AI Agent...\n==================================================\n1. Testing AI Provider...\nCould not connect to Ollama at http://host.docker.internal:11434: timed out\nCould not connect to Ollama at http://host.docker.internal:11434: timed out\n   Provider: MockAIProvider\n   Model: test-assistant\n   Endpoint: local://mock\n   Simple test result: \u26a0\ufe0f No AI model is currently available. Please configure a proper AI model (Ollama, OpenAI, or Anthro...\n\n2. Testing AI Agent...\nCould not connect to Ollama at http://host.docker.internal:11434: [Errno 113] No route to host\nCould not connect to Ollama at http://host.docker.internal:11434: [Errno 113] No route to host\n   Response type: text\n   Response content: \u26a0\ufe0f No AI model is currently available. Please configure a proper AI model (Ollama, OpenAI, or Anthropic) in Admin > AI Models.\n   Has tool results: False\n   Has event preview: False\n\n\u2705 Test completed successfully!\n",
+      "stderr": "2025-06-30 14:17:46,912 - app.ai_assistant - INFO - Using AI provider: MockAIProvider, model: test-assistant\n2025-06-30 14:17:46,912 - app.ai_assistant - INFO - Processing user message: 'I need a birthday party event for my 10 year old son James....' with 2 total messages\n2025-06-30 14:17:46,912 - app.ai_assistant - INFO - Processing message with 4 available tools\n2025-06-30 14:17:46,912 - app.ai_assistant - INFO - AI provider response received: has_content=True, has_tool_calls=False\n2025-06-30 14:17:46,912 - app.ai_assistant - INFO - Direct text response prepared: 126 characters\n"
+    }
+  }
+}

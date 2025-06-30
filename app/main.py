@@ -2,8 +2,8 @@ from fastapi import FastAPI, Request, Depends, Form, Path, Response, Cookie, HTT
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
-from app.database import SessionLocal, engine
-from app.models import Base, Event, User, Child, Booking, GalleryImage
+from app.database import SessionLocal, engine, get_db
+from app.models import Base, Event, User, Child, Booking, GalleryImage, ChatConversation, ChatMessage, AgentSession, AgentStatus
 from app.config import config
 from app.payment_service import get_payment_service
 from starlette.status import HTTP_303_SEE_OTHER
@@ -28,6 +28,8 @@ from authlib.integrations.starlette_client import OAuth
 import requests
 from sqlalchemy import text
 import logging
+import json
+import traceback
 
 app = FastAPI()
 # Use absolute path for templates to ensure correct resolution in Docker and local dev
@@ -129,13 +131,6 @@ def verify_password(plain_password, hashed_password):
 
 def create_session_cookie(user_id, max_age=SESSION_MAX_AGE):
     return serializer.dumps({"user_id": user_id})
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 def get_current_user(request: Request, db: Session = Depends(get_db), session: str = Cookie(None)):
     if not session:
@@ -1905,3 +1900,15 @@ async def admin_event_bookings(request: Request, event_id: int, user: User = Dep
         "timedelta": timedelta,
         "csrf_token": generate_csrf_token()
     })
+
+# ============================================================================
+# AI MODULE INTEGRATION - Phase 3 Complete! 🚀
+# ============================================================================
+# The monolithic AI endpoints (previously ~1590 lines) have been replaced
+# with our new modular AI service architecture from app/ai/
+# ============================================================================
+
+from app.ai.router import ai_router
+
+# Include the AI router with all endpoints
+app.include_router(ai_router)

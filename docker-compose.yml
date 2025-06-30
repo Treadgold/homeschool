@@ -1,30 +1,168 @@
 version: "3.9"
 services:
-  web:
-    build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
-    volumes:
-      - .:/app
+  # Main application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - RUN_TESTS_ON_BUILD=${RUN_TESTS_ON_BUILD:-true}
+    image: homeschool-app:latest
+    container_name: homeschool-app
+    restart: unless-stopped
     ports:
       - "8000:8000"
-    env_file:
-      - .env
+    volumes:
+      - .:/app  # Mount for development with live reload
+      - ./test_results:/app/test_results  # Mount test results for persistence
+      - ./uploads:/app/uploads
+      - static_files:/app/static
+    environment:
+      - DATABASE_URL=postgresql://user:pass@db:5432/homeschool
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_ENDPOINT=http://ollama:11434
+      # Test configuration - passed through from .env
+      - RUN_TESTS_ON_BUILD=${RUN_TESTS_ON_BUILD:-true}
+      - RUN_UNIT_TESTS=${RUN_UNIT_TESTS:-true}
+      - RUN_INTEGRATION_TESTS=${RUN_INTEGRATION_TESTS:-true}
+      - RUN_AI_TESTS=${RUN_AI_TESTS:-true}
+      - RUN_DATABASE_TESTS=${RUN_DATABASE_TESTS:-true}
+      - RUN_E2E_TESTS=${RUN_E2E_TESTS:-false}
+      - TEST_TIMEOUT=${TEST_TIMEOUT:-300}
+      - TEST_DATABASE_URL=${TEST_DATABASE_URL:-sqlite:///./test.db}
+      - TEST_FAST_MODE=${TEST_FAST_MODE:-false}
     depends_on:
       - db
+      - redis
       - mailhog
+    networks:
+      - homeschool-network
+    env_file:
+      - .env
+
+  # Database service
   db:
-    image: postgres:15
-    restart: always
+    image: postgres:15-alpine
+    container_name: homeschool-db
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: homeschool
       POSTGRES_USER: user
       POSTGRES_PASSWORD: pass
+    ports:
+      - "5432:5432"  # Expose for external debugging
+    networks:
+      - homeschool-network
+
+  # Redis for session management and caching
+  redis:
+    image: redis:7-alpine
+    container_name: homeschool-redis
+    restart: unless-stopped
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - redis_data:/data
+    ports:
+      - "6379:6379"  # Expose for external debugging
+    networks:
+      - homeschool-network
+
+  # MailHog for development email testing
   mailhog:
     image: mailhog/mailhog
+    container_name: homeschool-mailhog
+    restart: unless-stopped
     ports:
-      - "8025:8025"   # Web UI
-      - "1025:1025"   # SMTP
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - homeschool-network
+
+  # Ollama service for AI functionality
+  ollama:
+    image: ollama/ollama:latest
+    container_name: homeschool-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - homeschool-network
+    # Uncomment if you have GPU support
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # Test service - for running tests in isolation
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - RUN_TESTS_ON_BUILD=false  # Don't run tests during build for test service
+    image: homeschool-app:latest
+    container_name: homeschool-test
+    volumes:
+      - .:/app
+      - ./test_results:/app/test_results
+    environment:
+      - DATABASE_URL=postgresql://user:pass@db:5432/homeschool
+      - TEST_DATABASE_URL=sqlite:///./test.db
+      - OLLAMA_ENDPOINT=http://ollama:11434
+      # Enable all tests for dedicated test runs
+      - RUN_UNIT_TESTS=true
+      - RUN_INTEGRATION_TESTS=true
+      - RUN_AI_TESTS=true
+      - RUN_DATABASE_TESTS=true
+      - RUN_E2E_TESTS=true
+      - TEST_TIMEOUT=600
+      - TEST_FAST_MODE=false
+    command: python run_tests.py --comprehensive
+    depends_on:
+      - db
+      - redis
+      - ollama
+    networks:
+      - homeschool-network
+    profiles:
+      - test
+    env_file:
+      - .env
+
+  # Debug service - for troubleshooting
+  debug:
+    image: homeschool-app:latest
+    container_name: homeschool-debug
+    volumes:
+      - .:/app
+      - ./test_results:/app/test_results
+    environment:
+      - DATABASE_URL=postgresql://user:pass@db:5432/homeschool
+      - OLLAMA_ENDPOINT=http://ollama:11434
+    command: python scripts/debug_ai_agent.py
+    depends_on:
+      - db
+      - redis
+      - ollama
+    networks:
+      - homeschool-network
+    profiles:
+      - debug
+    env_file:
+      - .env
+
 volumes:
-  postgres_data: 
+  postgres_data:
+  redis_data:
+  ollama_data:
+  static_files:
+
+networks:
+  homeschool-network:
+    driver: bridge 
