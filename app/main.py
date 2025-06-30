@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 from app.database import SessionLocal, engine, get_db
-from app.models import Base, Event, User, Child, Booking, GalleryImage, ChatConversation, ChatMessage, AgentSession, AgentStatus
+from app.models import Base, Event, User, Child, Adult, Booking, AdultBooking, GalleryImage, ChatConversation, ChatMessage, AgentSession, AgentStatus
 from app.config import config
 from app.payment_service import get_payment_service
 from starlette.status import HTTP_303_SEE_OTHER
@@ -751,47 +751,259 @@ async def create_event(
     request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(require_admin),
+    # Basic Information (Stage 1)
     title: str = Form(...),
+    subtitle: str = Form(None),
+    event_type: str = Form(None),
+    status: str = Form("draft"),
+    short_description: str = Form(None),
     description: str = Form(None),
-    date: str = Form(...),
-    location: str = Form(None),
-    max_pupils: int = Form(None),
-    min_age: int = Form(None),
-    max_age: int = Form(None),
-    cost: float = Form(None),
-    image_url: str = Form(None),
-    image_file: UploadFile = None,
-    csrf_token: str = Form(None)
+    start_date: str = Form(...),  # datetime-local from form
+    end_date: str = Form(None),
+    timezone: str = Form("UTC"),
+    is_recurring: bool = Form(False),
+    
+    # Details & Location (Stage 2)
+    event_format: str = Form(None),
+    max_participants: str = Form(None),
+    min_age: str = Form(None),
+    max_age: str = Form(None),
+    venue_name: str = Form(None),
+    address: str = Form(None),
+    city: str = Form(None),
+    state: str = Form(None),
+    zip_code: str = Form(None),
+    country: str = Form(None),
+    meeting_id: str = Form(None),
+    meeting_password: str = Form(None),
+    what_to_bring: str = Form(None),
+    dress_code: str = Form(None),
+    language: str = Form("english"),
+    accessibility_info: str = Form(None),
+    parking_info: str = Form(None),
+    
+    # Media & Content (Stage 3)
+    video_url: str = Form(None),
+    event_agenda: str = Form(None),
+    speaker_info: str = Form(None),
+    rich_description: str = Form(None),
+    
+    # Ticketing & Pricing (Stage 4)
+    cost: str = Form(None),
+    is_free: bool = Form(False),
+    requires_registration: bool = Form(True),
+    early_bird_discount: str = Form(None),  # Changed to str to handle empty strings
+    group_discount: str = Form(None),       # Changed to str to handle empty strings  
+    member_discount: str = Form(None),      # Changed to str to handle empty strings
+    registration_deadline: str = Form(None),
+    
+    # External Links & Publishing (Stage 5)
+    website_url: str = Form(None),
+    booking_url: str = Form(None),
+    facebook_url: str = Form(None),
+    instagram_url: str = Form(None),
+    twitter_url: str = Form(None),
+    linkedin_url: str = Form(None),
+    youtube_url: str = Form(None),
+    tiktok_url: str = Form(None),
+    venue_website: str = Form(None),
+    partner_url: str = Form(None),
+    contact_name: str = Form(None),
+    contact_email: str = Form(None),
+    contact_phone: str = Form(None),
+    emergency_contact: str = Form(None),
+    terms_url: str = Form(None),
+    privacy_policy_url: str = Form(None),
+    featured_event: bool = Form(False),
+    send_notifications: bool = Form(True),
+    seo_keywords: str = Form(None),
+    
+    # File uploads
+    featured_image: UploadFile = File(None),
+    image_file: UploadFile = File(None),  # Keep for backward compatibility
+    csrf_token: str = Form(None),
+    
+    # Draft/Status control
+    save_as_draft: str = Form("true")
 ):
+    # CSRF check
     if not csrf_token or not verify_csrf_token(csrf_token):
-        return templates.TemplateResponse("create_event.html", {"request": request, "success": False, "current_user": user, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
-    event_date = datetime.strptime(date, "%Y-%m-%dT%H:%M")
-    final_image_url = image_url
-    if image_file is not None and image_file.filename:
-        # Only allow image files
-        if not image_file.content_type.startswith("image/"):
-            return templates.TemplateResponse("create_event.html", {"request": request, "success": False, "current_user": user, "error": "Only image files are allowed.", "csrf_token": generate_csrf_token()})
-        ext = image_file.filename.split('.')[-1]
-        unique_name = f"{uuid.uuid4().hex}.{ext}"
-        save_path = f"app/static/event_images/{unique_name}"
-        with open(save_path, "wb") as buffer:
-            shutil.copyfileobj(image_file.file, buffer)
-        final_image_url = f"/static/event_images/{unique_name}"
-    new_event = Event(
-        title=title,
-        description=description,
-        date=event_date,
-        location=location,
-        max_pupils=max_pupils,
-        min_age=min_age,
-        max_age=max_age,
-        cost=cost,
-        image_url=final_image_url
-    )
-    db.add(new_event)
-    db.commit()
-    db.refresh(new_event)
-    return RedirectResponse(url=f"/event/{new_event.id}", status_code=HTTP_303_SEE_OTHER)
+        return templates.TemplateResponse("create_event.html", {
+            "request": request, 
+            "success": False, 
+            "current_user": user, 
+            "error": "Invalid or missing CSRF token.", 
+            "csrf_token": generate_csrf_token()
+        })
+    
+    try:
+        # Helper function to safely parse float values
+        def safe_float_parse(value):
+            """Safely parse a float value, returning None for empty/invalid inputs"""
+            if not value or value.strip() == "":
+                return None
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return None
+        
+        # Helper function to safely parse integer values
+        def safe_int_parse(value):
+            """Safely parse an integer value, returning None for empty/invalid inputs"""
+            if not value or value.strip() == "":
+                return None
+            try:
+                return int(value)
+            except (ValueError, TypeError):
+                return None
+        
+        # Parse start date (required)
+        start_datetime = datetime.strptime(start_date, "%Y-%m-%dT%H:%M")
+        
+        # Parse end date (optional)
+        end_datetime = None
+        if end_date:
+            end_datetime = datetime.strptime(end_date, "%Y-%m-%dT%H:%M")
+        
+        # Parse registration deadline (optional)
+        registration_deadline_datetime = None
+        if registration_deadline:
+            registration_deadline_datetime = datetime.strptime(registration_deadline, "%Y-%m-%dT%H:%M")
+        
+        # Handle image upload
+        final_image_url = None
+        image_to_process = featured_image if featured_image and featured_image.filename else image_file
+        
+        if image_to_process and image_to_process.filename:
+            # Validate image file
+            if not image_to_process.content_type.startswith("image/"):
+                return templates.TemplateResponse("create_event.html", {
+                    "request": request, 
+                    "success": False, 
+                    "current_user": user, 
+                    "error": "Only image files are allowed.", 
+                    "csrf_token": generate_csrf_token()
+                })
+            
+            # Save image
+            ext = image_to_process.filename.split('.')[-1]
+            unique_name = f"{uuid.uuid4().hex}.{ext}"
+            
+            # Ensure directory exists
+            import os
+            os.makedirs("app/static/event_images", exist_ok=True)
+            
+            save_path = f"app/static/event_images/{unique_name}"
+            with open(save_path, "wb") as buffer:
+                shutil.copyfileobj(image_to_process.file, buffer)
+            final_image_url = f"/static/event_images/{unique_name}"
+        
+        # Determine final status based on draft preference
+        is_draft = save_as_draft.lower() == "true"
+        final_status = "draft" if is_draft else "published"
+        
+        # Create new event with all comprehensive fields
+        new_event = Event(
+            # Basic Information
+            title=title,
+            subtitle=subtitle,
+            event_type=event_type,
+            status=final_status,
+            short_description=short_description,
+            description=description,
+            date=start_datetime,  # Map to existing 'date' field
+            end_date=end_datetime,
+            timezone=timezone,
+            is_recurring=is_recurring,
+            
+            # Details & Location
+            event_format=event_format,
+            max_participants=safe_int_parse(max_participants),
+            min_age=safe_int_parse(min_age),
+            max_age=safe_int_parse(max_age),
+            venue_name=venue_name,
+            address=address,
+            city=city,
+            state=state,
+            zip_code=zip_code,
+            country=country,
+            meeting_id=meeting_id,
+            meeting_password=meeting_password,
+            what_to_bring=what_to_bring,
+            dress_code=dress_code,
+            language=language,
+            accessibility_info=accessibility_info,
+            parking_info=parking_info,
+            
+            # Media & Content
+            image_url=final_image_url,
+            video_url=video_url,
+            event_agenda=event_agenda,
+            speaker_info=speaker_info,
+            rich_description=rich_description,
+            
+            # Ticketing & Pricing
+            cost=safe_float_parse(cost),
+            is_free=is_free,
+            requires_registration=requires_registration,
+            early_bird_discount=safe_float_parse(early_bird_discount),
+            group_discount=safe_float_parse(group_discount),
+            member_discount=safe_float_parse(member_discount),
+            registration_deadline=registration_deadline_datetime,
+            
+            # External Links & Publishing
+            website_url=website_url,
+            booking_url=booking_url,
+            facebook_url=facebook_url,
+            instagram_url=instagram_url,
+            twitter_url=twitter_url,
+            linkedin_url=linkedin_url,
+            youtube_url=youtube_url,
+            tiktok_url=tiktok_url,
+            venue_website=venue_website,
+            partner_url=partner_url,
+            contact_name=contact_name,
+            contact_email=contact_email,
+            contact_phone=contact_phone,
+            emergency_contact=emergency_contact,
+            terms_url=terms_url,
+            privacy_policy_url=privacy_policy_url,
+            featured_event=featured_event,
+            send_notifications=send_notifications,
+            seo_keywords=seo_keywords,
+            
+            # System fields
+            created_by=user.id,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        db.add(new_event)
+        db.commit()
+        db.refresh(new_event)
+        
+        # Redirect based on status
+        if final_status == "draft":
+            return RedirectResponse(url=f"/admin/events?draft_saved={new_event.id}", status_code=HTTP_303_SEE_OTHER)
+        else:
+            return RedirectResponse(url=f"/event/{new_event.id}?published=true", status_code=HTTP_303_SEE_OTHER)
+        
+    except ValueError as e:
+        return templates.TemplateResponse("create_event.html", {
+            "request": request, 
+            "success": False, 
+            "current_user": user, 
+            "error": f"Invalid date format: {str(e)}", 
+            "csrf_token": generate_csrf_token()
+        })
+    except Exception as e:
+        return templates.TemplateResponse("create_event.html", {
+            "request": request, 
+            "success": False, 
+            "current_user": user, 
+            "error": f"Error creating event: {str(e)}", 
+            "csrf_token": generate_csrf_token()
+        })
 
 @app.get("/event/{event_id}", response_class=HTMLResponse)
 async def event_detail(request: Request, event_id: int = Path(...), db: Session = Depends(get_db)):
@@ -986,12 +1198,14 @@ def create_test_users():
 async def profile_get(request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
-    # Get all bookings for this user (via their children)
+    # Get all bookings for this user (via their children and adults)
     children = db.query(Child).filter(Child.user_id == user.id).all()
+    adults = db.query(Adult).filter(Adult.user_id == user.id).all()
     bookings = db.query(Booking).join(Child).filter(Child.user_id == user.id).join(Event).all()
+    adult_bookings = db.query(AdultBooking).join(Adult).filter(Adult.user_id == user.id).join(Event).all()
     from datetime import datetime
     now = datetime.utcnow()
-    return templates.TemplateResponse("profile.html", {"request": request, "user": user, "children": children, "bookings": bookings, "success": None, "error": None, "now": now})
+    return templates.TemplateResponse("profile.html", {"request": request, "user": user, "children": children, "adults": adults, "bookings": bookings, "adult_bookings": adult_bookings, "success": None, "error": None, "now": now})
 
 @app.post("/profile", response_class=HTMLResponse)
 async def profile_post(
@@ -1037,17 +1251,98 @@ async def profile_post(
 async def cancel_booking(request: Request, booking_id: int = Form(...), csrf_token: str = Form(None), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    
     if not csrf_token or not verify_csrf_token(csrf_token):
         children = db.query(Child).filter(Child.user_id == user.id).all()
         bookings = db.query(Booking).join(Child).filter(Child.user_id == user.id).join(Event).all()
         return templates.TemplateResponse("profile.html", {"request": request, "user": user, "children": children, "bookings": bookings, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
-    booking = db.query(Booking).join(Child).filter(Booking.id == booking_id, Child.user_id == user.id).first()
-    if booking:
-        db.delete(booking)
-        db.commit()
-        success = "Booking cancelled."
+    
+    # Get the booking with event details
+    booking = db.query(Booking).join(Child).join(Event).filter(
+        Booking.id == booking_id, 
+        Child.user_id == user.id
+    ).first()
+    
+    if not booking:
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        bookings = db.query(Booking).join(Child).filter(Child.user_id == user.id).join(Event).all()
+        return templates.TemplateResponse("profile.html", {"request": request, "user": user, "children": children, "bookings": bookings, "success": None, "error": "Booking not found.", "csrf_token": generate_csrf_token()})
+    
+    # Check if booking is already cancelled
+    if booking.booking_status == "cancelled":
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        bookings = db.query(Booking).join(Child).filter(Child.user_id == user.id).join(Event).all()
+        return templates.TemplateResponse("profile.html", {"request": request, "user": user, "children": children, "bookings": bookings, "success": None, "error": "This booking is already cancelled.", "csrf_token": generate_csrf_token()})
+    
+    # Check if cancellation request is already pending
+    if booking.booking_status == "cancellation_requested":
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        bookings = db.query(Booking).join(Child).filter(Child.user_id == user.id).join(Event).all()
+        return templates.TemplateResponse("profile.html", {"request": request, "user": user, "children": children, "bookings": bookings, "success": None, "error": "Cancellation request is already pending for this booking.", "csrf_token": generate_csrf_token()})
+    
+    # Handle different scenarios based on payment status and event cost
+    if booking.event.cost and booking.event.cost > 0:
+        # Paid event - handle based on payment status
+        if booking.payment_status == 'paid':
+            # Paid booking - create cancellation request for admin approval
+            booking.booking_status = "cancellation_requested"
+            booking.cancellation_requested_at = datetime.utcnow()
+            booking.cancellation_reason = "Customer requested cancellation"
+            
+            db.commit()
+            
+            # Send notification email to admin (optional)
+            try:
+                admin_email_body = f"""
+                Cancellation Request Received
+                
+                Event: {booking.event.title}
+                Date: {booking.event.date.strftime('%B %d, %Y at %I:%M %p')}
+                Customer: {user.email}
+                Child: {booking.child.name}
+                Amount Paid: ${booking.event.cost:.2f}
+                
+                Please review this cancellation request and process any necessary refunds.
+                """
+                # You can implement admin notification here
+                # send_email("admin@lifelearners.org.nz", "Cancellation Request", admin_email_body)
+            except Exception as e:
+                print(f"Failed to send admin notification: {e}")
+            
+            success = f"Cancellation request submitted for {booking.child.name}'s booking to '{booking.event.title}'. An admin will review your request and process any refunds if approved."
+            
+        elif booking.payment_status == 'pending':
+            # Pending payment - can cancel immediately
+            booking.booking_status = "cancelled"
+            booking.cancelled_at = datetime.utcnow()
+            booking.cancellation_reason = "Customer cancelled before payment"
+            db.commit()
+            success = f"Booking cancelled for {booking.child.name} to '{booking.event.title}'."
+            
+        elif booking.payment_status == 'failed':
+            # Failed payment - can cancel immediately
+            booking.booking_status = "cancelled"
+            booking.cancelled_at = datetime.utcnow()
+            booking.cancellation_reason = "Customer cancelled after payment failed"
+            db.commit()
+            success = f"Booking cancelled for {booking.child.name} to '{booking.event.title}'."
+            
+        else:
+            # Unpaid booking - can cancel immediately
+            booking.booking_status = "cancelled"
+            booking.cancelled_at = datetime.utcnow()
+            booking.cancellation_reason = "Customer cancelled unpaid booking"
+            db.commit()
+            success = f"Booking cancelled for {booking.child.name} to '{booking.event.title}'."
+            
     else:
-        success = None
+        # Free event - can cancel immediately
+        booking.booking_status = "cancelled"
+        booking.cancelled_at = datetime.utcnow()
+        booking.cancellation_reason = "Customer cancelled free event booking"
+        db.commit()
+        success = f"Booking cancelled for {booking.child.name} to '{booking.event.title}'."
+    
     # Reload profile page with updated bookings
     children = db.query(Child).filter(Child.user_id == user.id).all()
     bookings = db.query(Booking).join(Child).filter(Child.user_id == user.id).join(Event).all()
@@ -1063,7 +1358,37 @@ async def book_event_get(request: Request, event_id: int, db: Session = Depends(
     if not event:
         return HTMLResponse(content="<h1>Event not found</h1>", status_code=404)
     children = db.query(Child).filter(Child.user_id == user.id).all()
-    return templates.TemplateResponse("booking.html", {"request": request, "event": event, "user": user, "children": children, "success": None, "error": None, "csrf_token": generate_csrf_token()})
+    adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+    
+    # Get already booked children and adults for this event
+    booked_child_ids = set(
+        booking.child_id for booking in db.query(Booking).filter(
+            Booking.event_id == event_id,
+            Booking.child_id.in_([child.id for child in children]),
+            Booking.booking_status != "cancelled"
+        ).all()
+    )
+    
+    booked_adult_ids = set(
+        booking.adult_id for booking in db.query(AdultBooking).filter(
+            AdultBooking.event_id == event_id,
+            AdultBooking.adult_id.in_([adult.id for adult in adults]),
+            AdultBooking.booking_status != "cancelled"
+        ).all()
+    )
+    
+    return templates.TemplateResponse("booking.html", {
+        "request": request, 
+        "event": event, 
+        "user": user, 
+        "children": children, 
+        "adults": adults, 
+        "booked_child_ids": booked_child_ids,
+        "booked_adult_ids": booked_adult_ids,
+        "success": None, 
+        "error": None, 
+        "csrf_token": generate_csrf_token()
+    })
 
 @app.post("/event/{event_id}/book", response_class=HTMLResponse)
 async def book_event_post(
@@ -1076,14 +1401,57 @@ async def book_event_post(
     new_child_ages: List[str] = Form([]),
     new_child_allergies: List[str] = Form([]),
     new_child_notes: List[str] = Form([]),
+    new_child_needs_adult: List[bool] = Form([]),
+    adult_ids: List[int] = Form([]),
+    new_adult_names: List[str] = Form([]),
+    new_adult_relationships: List[str] = Form([]),
+    new_adult_phones: List[str] = Form([]),
+    new_adult_emails: List[str] = Form([]),
+    new_adult_allergies: List[str] = Form([]),
+    new_adult_roles: List[str] = Form([]),
+    new_adult_can_supervise: List[bool] = Form([]),
+    new_adult_volunteer: List[bool] = Form([]),
     csrf_token: str = Form(None)
 ):
+    # Get all form data to handle dynamic adult role fields early
+    form_data = await request.form()
+    
     if not user:
         return RedirectResponse(url="/login", status_code=HTTP_303_SEE_OTHER)
     if not csrf_token or not verify_csrf_token(csrf_token):
         event = db.query(Event).filter(Event.id == event_id).first()
         children = db.query(Child).filter(Child.user_id == user.id).all()
-        return templates.TemplateResponse("booking.html", {"request": request, "event": event, "user": user, "children": children, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        
+        # Get already booked children and adults for this event
+        booked_child_ids = set(
+            booking.child_id for booking in db.query(Booking).filter(
+                Booking.event_id == event_id,
+                Booking.child_id.in_([child.id for child in children]),
+                Booking.booking_status != "cancelled"
+            ).all()
+        )
+        
+        booked_adult_ids = set(
+            booking.adult_id for booking in db.query(AdultBooking).filter(
+                AdultBooking.event_id == event_id,
+                AdultBooking.adult_id.in_([adult.id for adult in adults]),
+                AdultBooking.booking_status != "cancelled"
+            ).all()
+        )
+        
+        return templates.TemplateResponse("booking.html", {
+            "request": request, 
+            "event": event, 
+            "user": user, 
+            "children": children, 
+            "adults": adults, 
+            "booked_child_ids": booked_child_ids,
+            "booked_adult_ids": booked_adult_ids,
+            "success": None, 
+            "error": "Invalid or missing CSRF token.", 
+            "csrf_token": generate_csrf_token()
+        })
     event = db.query(Event).filter(Event.id == event_id).first()
     if not event:
         return HTMLResponse(content="<h1>Event not found</h1>", status_code=404)
@@ -1091,14 +1459,28 @@ async def book_event_post(
     success = None
     booked_children = []
     duplicate_children = []
+    booked_adults = []
+    duplicate_adults = []
+    already_booked_children = []
+    already_booked_adults = []
     
     # Book existing children
     for cid in child_ids:
         child = db.query(Child).filter(Child.id == cid, Child.user_id == user.id).first()
         if child:
-            booking = Booking(event_id=event.id, child_id=child.id)
-            db.add(booking)
-            booked_children.append(child.name)
+            # Check if this child is already booked for this event
+            existing_booking = db.query(Booking).filter(
+                Booking.event_id == event.id,
+                Booking.child_id == child.id,
+                Booking.booking_status != "cancelled"
+            ).first()
+            
+            if existing_booking:
+                already_booked_children.append(child.name)
+            else:
+                booking = Booking(event_id=event.id, child_id=child.id)
+                db.add(booking)
+                booked_children.append(child.name)
     
     # Add and book new children with duplicate detection
     for i, name in enumerate(new_child_names):
@@ -1113,64 +1495,179 @@ async def book_event_post(
         
         if existing_child:
             duplicate_children.append(name.strip())
-            # Still book the existing child if not already selected
+            # Still book the existing child if not already selected and not already booked for this event
             if existing_child.id not in child_ids:
-                booking = Booking(event_id=event.id, child_id=existing_child.id)
-                db.add(booking)
-                booked_children.append(existing_child.name)
+                # Check if this child is already booked for this event
+                existing_booking = db.query(Booking).filter(
+                    Booking.event_id == event.id,
+                    Booking.child_id == existing_child.id,
+                    Booking.booking_status != "cancelled"
+                ).first()
+                
+                if existing_booking:
+                    already_booked_children.append(existing_child.name)
+                else:
+                    booking = Booking(event_id=event.id, child_id=existing_child.id)
+                    db.add(booking)
+                    booked_children.append(existing_child.name)
             continue
         
         age = int(new_child_ages[i]) if i < len(new_child_ages) and new_child_ages[i] else None
         allergies = new_child_allergies[i] if i < len(new_child_allergies) else None
         notes = new_child_notes[i] if i < len(new_child_notes) else None
+        needs_adult = i < len(new_child_needs_adult) and new_child_needs_adult[i]
         
-        child = Child(user_id=user.id, name=name.strip(), age=age, allergies=allergies, notes=notes)
+        child = Child(user_id=user.id, name=name.strip(), age=age, allergies=allergies, notes=notes, needs_assisting_adult=needs_adult)
         db.add(child)
         db.commit()
         db.refresh(child)
-        booking = Booking(event_id=event.id, child_id=child.id)
-        db.add(booking)
-        booked_children.append(child.name)
+        
+        # Check if this child is already booked for this event (shouldn't happen for new child, but safety check)
+        existing_booking = db.query(Booking).filter(
+            Booking.event_id == event.id,
+            Booking.child_id == child.id,
+            Booking.booking_status != "cancelled"
+        ).first()
+        
+        if not existing_booking:
+            booking = Booking(event_id=event.id, child_id=child.id)
+            db.add(booking)
+            booked_children.append(child.name)
+    
+    # Book existing adults
+    for aid in adult_ids:
+        adult = db.query(Adult).filter(Adult.id == aid, Adult.user_id == user.id).first()
+        if adult:
+            # Check if this adult is already booked for this event
+            existing_booking = db.query(AdultBooking).filter(
+                AdultBooking.event_id == event.id,
+                AdultBooking.adult_id == adult.id,
+                AdultBooking.booking_status != "cancelled"
+            ).first()
+            
+            if existing_booking:
+                already_booked_adults.append(adult.name)
+            else:
+                # Get the role for this adult from the form data
+                role = form_data.get(f"adult_role_{aid}", "attendee")
+                adult_booking = AdultBooking(event_id=event.id, adult_id=adult.id, role=role)
+                db.add(adult_booking)
+                booked_adults.append(adult.name)
+    
+    # Add and book new adults with duplicate detection
+    for i, name in enumerate(new_adult_names):
+        if not name.strip():
+            continue
+        
+        # Check for duplicate adults (case-insensitive name matching)
+        existing_adult = db.query(Adult).filter(
+            Adult.user_id == user.id,
+            Adult.name.ilike(name.strip())
+        ).first()
+        
+        if existing_adult:
+            duplicate_adults.append(name.strip())
+            # Still book the existing adult if not already selected and not already booked for this event
+            if existing_adult.id not in adult_ids:
+                # Check if this adult is already booked for this event
+                existing_booking = db.query(AdultBooking).filter(
+                    AdultBooking.event_id == event.id,
+                    AdultBooking.adult_id == existing_adult.id,
+                    AdultBooking.booking_status != "cancelled"
+                ).first()
+                
+                if existing_booking:
+                    already_booked_adults.append(existing_adult.name)
+                else:
+                    role = new_adult_roles[i] if i < len(new_adult_roles) else "attendee"
+                    adult_booking = AdultBooking(event_id=event.id, adult_id=existing_adult.id, role=role)
+                    db.add(adult_booking)
+                    booked_adults.append(existing_adult.name)
+            continue
+        
+        relationship = new_adult_relationships[i] if i < len(new_adult_relationships) else None
+        phone = new_adult_phones[i] if i < len(new_adult_phones) else None
+        email = new_adult_emails[i] if i < len(new_adult_emails) else None
+        allergies = new_adult_allergies[i] if i < len(new_adult_allergies) else None
+        role = new_adult_roles[i] if i < len(new_adult_roles) else "attendee"
+        can_supervise = i < len(new_adult_can_supervise) and new_adult_can_supervise[i]
+        willing_volunteer = i < len(new_adult_volunteer) and new_adult_volunteer[i]
+        
+        adult = Adult(
+            user_id=user.id, 
+            name=name.strip(), 
+            relationship_to_family=relationship,
+            phone=phone,
+            email=email,
+            allergies=allergies,
+            can_supervise_children=can_supervise,
+            willing_to_volunteer=willing_volunteer
+        )
+        db.add(adult)
+        db.commit()
+        db.refresh(adult)
+        
+        # Check if this adult is already booked for this event (shouldn't happen for new adult, but safety check)
+        existing_booking = db.query(AdultBooking).filter(
+            AdultBooking.event_id == event.id,
+            AdultBooking.adult_id == adult.id,
+            AdultBooking.booking_status != "cancelled"
+        ).first()
+        
+        if not existing_booking:
+            adult_booking = AdultBooking(event_id=event.id, adult_id=adult.id, role=role)
+            db.add(adult_booking)
+            booked_adults.append(adult.name)
     
     # Check if event requires payment
     if event.cost and event.cost > 0:
-        # Calculate total cost
-        total_children = len(child_ids) + len([name for name in new_child_names if name.strip()])
-        total_cost_dollars = event.cost * total_children
-        total_cost_cents = int(total_cost_dollars * 100)
-        
-        # Create payment intent or checkout session
-        payment_service = get_payment_service()
-        booking_details = {
-            'event_id': event.id,
-            'event_title': event.title,
-            'child_count': total_children
-        }
-        
-        # For this example, we'll use Stripe Checkout (easier for initial implementation)
-        payment_result = payment_service.create_checkout_session(
-            amount_cents=total_cost_cents,
-            booking_details=booking_details,
-            customer_email=user.email,
-            success_url=f"{config.SITE_URL}/payment/success?event_id={event.id}",
-            cancel_url=f"{config.SITE_URL}/event/{event.id}/book"
-        )
-        
-        if payment_result['success']:
-            # Store temporary booking info in session or database
-            # For now, we'll commit the bookings but mark them as pending payment
-            for booking in db.query(Booking).filter(
-                Booking.event_id == event.id,
-                Booking.child_id.in_([b.child_id for b in db.query(Booking).filter(Booking.event_id == event.id)])
-            ):
-                booking.payment_status = 'pending'
-            
-            db.commit()
-            
-            # Redirect to Stripe Checkout
-            return RedirectResponse(url=payment_result['checkout_url'], status_code=HTTP_303_SEE_OTHER)
+        # Calculate total cost for newly booked participants only
+        total_new_participants = len(booked_children) + len(booked_adults)
+        if total_new_participants > 0:
+            total_cost_dollars = event.cost * total_new_participants
+            total_cost_cents = int(total_cost_dollars * 100)
         else:
-            error = f"Payment setup failed: {payment_result.get('error', 'Unknown error')}"
+            total_cost_cents = 0
+        
+        # Only proceed with payment if there are new bookings
+        if total_new_participants > 0:
+            # Create payment intent or checkout session
+            payment_service = get_payment_service()
+            booking_details = {
+                'event_id': event.id,
+                'event_title': event.title,
+                'child_count': len(booked_children),
+                'adult_count': len(booked_adults),
+                'total_participants': total_new_participants
+            }
+        
+            # For this example, we'll use Stripe Checkout (easier for initial implementation)
+            payment_result = payment_service.create_checkout_session(
+                amount_cents=total_cost_cents,
+                booking_details=booking_details,
+                customer_email=user.email,
+                success_url=f"{config.SITE_URL}/payment/success?event_id={event.id}",
+                cancel_url=f"{config.SITE_URL}/event/{event.id}/book"
+            )
+            
+            if payment_result['success']:
+                # Store temporary booking info in session or database
+                # For now, we'll commit the bookings but mark them as pending payment
+                for booking in db.query(Booking).filter(
+                    Booking.event_id == event.id,
+                    Booking.child_id.in_([b.child_id for b in db.query(Booking).filter(Booking.event_id == event.id)])
+                ):
+                    booking.payment_status = 'pending'
+                
+                db.commit()
+                
+                # Redirect to Stripe Checkout
+                return RedirectResponse(url=payment_result['checkout_url'], status_code=HTTP_303_SEE_OTHER)
+            else:
+                error = f"Payment setup failed: {payment_result.get('error', 'Unknown error')}"
+        else:
+            # No new bookings to charge for, but we still need to mark any existing bookings as appropriate
+            pass
     else:
         # Free event - mark as paid
         for booking in db.query(Booking).filter(
@@ -1181,17 +1678,72 @@ async def book_event_post(
     
     db.commit()
     children = db.query(Child).filter(Child.user_id == user.id).all()
+    adults = db.query(Adult).filter(Adult.user_id == user.id).all()
     
-    if booked_children:
-        success = f"Booked: {', '.join(booked_children)}"
-        if duplicate_children:
-            success += f" (Note: {', '.join(duplicate_children)} already existed and were used instead)"
-        if event.cost and event.cost > 0:
-            success += " - Redirecting to payment..."
+    # Get updated already booked children and adults for this event after processing
+    booked_child_ids_final = set(
+        booking.child_id for booking in db.query(Booking).filter(
+            Booking.event_id == event_id,
+            Booking.child_id.in_([child.id for child in children]),
+            Booking.booking_status != "cancelled"
+        ).all()
+    )
+    
+    booked_adult_ids_final = set(
+        booking.adult_id for booking in db.query(AdultBooking).filter(
+            AdultBooking.event_id == event_id,
+            AdultBooking.adult_id.in_([adult.id for adult in adults]),
+            AdultBooking.booking_status != "cancelled"
+        ).all()
+    )
+    
+    if booked_children or booked_adults or already_booked_children or already_booked_adults:
+        success_parts = []
+        if booked_children:
+            success_parts.append(f"New bookings - Children: {', '.join(booked_children)}")
+        if booked_adults:
+            success_parts.append(f"New bookings - Adults: {', '.join(booked_adults)}")
+        
+        # Add information about duplicates
+        if already_booked_children or already_booked_adults:
+            duplicate_parts = []
+            if already_booked_children:
+                duplicate_parts.append(f"Children: {', '.join(already_booked_children)}")
+            if already_booked_adults:
+                duplicate_parts.append(f"Adults: {', '.join(already_booked_adults)}")
+            success_parts.append(f"Already booked - {' | '.join(duplicate_parts)}")
+        
+        if duplicate_children or duplicate_adults:
+            existing_parts = []
+            if duplicate_children:
+                existing_parts.append(f"Children: {', '.join(duplicate_children)}")
+            if duplicate_adults:
+                existing_parts.append(f"Adults: {', '.join(duplicate_adults)}")
+            success_parts.append(f"(Note: {' | '.join(existing_parts)} already existed and were used instead)")
+        
+        if success_parts:
+            success = ' | '.join(success_parts)
+        
+        if booked_children or booked_adults:
+            if event.cost and event.cost > 0:
+                success += " - Redirecting to payment..."
+        elif already_booked_children or already_booked_adults:
+            success += " - No payment required (already registered)"
     else:
-        error = "No children selected or added."
+        error = "No participants selected or added."
     
-    return templates.TemplateResponse("booking.html", {"request": request, "event": event, "user": user, "children": children, "success": success, "error": error, "csrf_token": generate_csrf_token()})
+    return templates.TemplateResponse("booking.html", {
+        "request": request, 
+        "event": event, 
+        "user": user, 
+        "children": children, 
+        "adults": adults, 
+        "booked_child_ids": booked_child_ids_final,
+        "booked_adult_ids": booked_adult_ids_final,
+        "success": success, 
+        "error": error, 
+        "csrf_token": generate_csrf_token()
+    })
 
 @app.get("/resend-confirmation", response_class=HTMLResponse)
 async def resend_confirmation_form(request: Request, email: str = Query(None)):
@@ -1285,14 +1837,255 @@ async def admin_dashboard(request: Request, user: User = Depends(require_admin),
     })
 
 @app.get("/admin/events", response_class=HTMLResponse)
-async def admin_events(request: Request, user: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def admin_events(request: Request, user: User = Depends(require_admin), db: Session = Depends(get_db), draft_saved: int = Query(None), updated: int = Query(None)):
     events = db.query(Event).order_by(Event.date.desc()).all()
+    
+    # Check for success messages
+    success_message = None
+    if draft_saved:
+        draft_event = db.query(Event).filter(Event.id == draft_saved).first()
+        if draft_event:
+            success_message = f"✅ Draft event '{draft_event.title}' saved successfully! You can continue editing it later."
+    elif updated:
+        updated_event = db.query(Event).filter(Event.id == updated).first()
+        if updated_event:
+            success_message = f"✅ Event '{updated_event.title}' updated successfully!"
+    
     return templates.TemplateResponse("admin_events.html", {
         "request": request,
         "current_user": user,
         "events": events,
+        "success_message": success_message,
         "csrf_token": generate_csrf_token()
     })
+
+@app.get("/admin/events/{event_id}/edit", response_class=HTMLResponse)
+async def edit_event_form(request: Request, event_id: int, user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    return templates.TemplateResponse("edit_event.html", {
+        "request": request,
+        "current_user": user,
+        "event": event,
+        "csrf_token": generate_csrf_token()
+    })
+
+@app.post("/admin/events/{event_id}/edit", response_class=HTMLResponse)
+async def edit_event_post(
+    request: Request,
+    event_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+    # All the same fields as create event
+    title: str = Form(...),
+    subtitle: str = Form(""),
+    event_type: str = Form(""),
+    status: str = Form("draft"),
+    short_description: str = Form(""),
+    description: str = Form(""),
+    start_date: str = Form(...),
+    end_date: str = Form(""),
+    timezone: str = Form("Pacific/Auckland"),
+    is_recurring: bool = Form(False),
+    event_format: str = Form(""),
+    max_participants: str = Form(""),
+    min_age: str = Form(""),
+    max_age: str = Form(""),
+    venue_name: str = Form(""),
+    address: str = Form(""),
+    city: str = Form(""),
+    state: str = Form(""),
+    zip_code: str = Form(""),
+    country: str = Form("New Zealand"),
+    meeting_id: str = Form(""),
+    meeting_password: str = Form(""),
+    what_to_bring: str = Form(""),
+    dress_code: str = Form(""),
+    language: str = Form("english"),
+    accessibility_info: str = Form(""),
+    parking_info: str = Form(""),
+    video_url: str = Form(""),
+    event_agenda: str = Form(""),
+    speaker_info: str = Form(""),
+    rich_description: str = Form(""),
+    cost: str = Form(""),
+    is_free: bool = Form(False),
+    requires_registration: bool = Form(True),
+    early_bird_discount: str = Form(""),
+    group_discount: str = Form(""),
+    member_discount: str = Form(""),
+    registration_deadline: str = Form(""),
+    website_url: str = Form(""),
+    booking_url: str = Form(""),
+    facebook_url: str = Form(""),
+    instagram_url: str = Form(""),
+    twitter_url: str = Form(""),
+    linkedin_url: str = Form(""),
+    youtube_url: str = Form(""),
+    tiktok_url: str = Form(""),
+    venue_website: str = Form(""),
+    partner_url: str = Form(""),
+    contact_name: str = Form(""),
+    contact_email: str = Form(""),
+    contact_phone: str = Form(""),
+    emergency_contact: str = Form(""),
+    terms_url: str = Form(""),
+    privacy_policy_url: str = Form(""),
+    featured_event: bool = Form(False),
+    send_notifications: bool = Form(True),
+    seo_keywords: str = Form(""),
+    featured_image: UploadFile = File(None),
+    csrf_token: str = Form(None)
+):
+    # CSRF check
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        return templates.TemplateResponse("edit_event.html", {
+            "request": request,
+            "current_user": user,
+            "error": "Invalid or missing CSRF token.",
+            "csrf_token": generate_csrf_token()
+        })
+
+    try:
+        # Get the existing event
+        event = db.query(Event).filter(Event.id == event_id).first()
+        if not event:
+            raise HTTPException(status_code=404, detail="Event not found")
+
+        # Helper functions for safe parsing
+        def safe_float_parse(value):
+            if not value or value.strip() == "":
+                return None
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return None
+
+        def safe_int_parse(value):
+            if not value or value.strip() == "":
+                return None
+            try:
+                return int(value)
+            except (ValueError, TypeError):
+                return None
+
+        # Parse dates
+        start_datetime = datetime.strptime(start_date, "%Y-%m-%dT%H:%M")
+        end_datetime = None
+        if end_date:
+            end_datetime = datetime.strptime(end_date, "%Y-%m-%dT%H:%M")
+        
+        registration_deadline_datetime = None
+        if registration_deadline:
+            registration_deadline_datetime = datetime.strptime(registration_deadline, "%Y-%m-%dT%H:%M")
+
+        # Handle image upload
+        final_image_url = event.image_url  # Keep existing image by default
+        if featured_image and featured_image.filename:
+            if not featured_image.content_type.startswith("image/"):
+                return templates.TemplateResponse("edit_event.html", {
+                    "request": request,
+                    "current_user": user,
+                    "event": event,
+                    "error": "Only image files are allowed.",
+                    "csrf_token": generate_csrf_token()
+                })
+
+            ext = featured_image.filename.split('.')[-1]
+            unique_name = f"{uuid.uuid4().hex}.{ext}"
+            
+            import os
+            os.makedirs("app/static/event_images", exist_ok=True)
+            
+            save_path = f"app/static/event_images/{unique_name}"
+            with open(save_path, "wb") as buffer:
+                shutil.copyfileobj(featured_image.file, buffer)
+            final_image_url = f"/static/event_images/{unique_name}"
+
+        # Update all fields
+        event.title = title
+        event.subtitle = subtitle
+        event.event_type = event_type
+        event.status = status
+        event.short_description = short_description
+        event.description = description
+        event.date = start_datetime
+        event.end_date = end_datetime
+        event.timezone = timezone
+        event.is_recurring = is_recurring
+        event.event_format = event_format
+        event.max_participants = safe_int_parse(max_participants)
+        event.min_age = safe_int_parse(min_age)
+        event.max_age = safe_int_parse(max_age)
+        event.venue_name = venue_name
+        event.address = address
+        event.city = city
+        event.state = state
+        event.zip_code = zip_code
+        event.country = country
+        event.meeting_id = meeting_id
+        event.meeting_password = meeting_password
+        event.what_to_bring = what_to_bring
+        event.dress_code = dress_code
+        event.language = language
+        event.accessibility_info = accessibility_info
+        event.parking_info = parking_info
+        event.image_url = final_image_url
+        event.video_url = video_url
+        event.event_agenda = event_agenda
+        event.speaker_info = speaker_info
+        event.rich_description = rich_description
+        event.cost = safe_float_parse(cost)
+        event.is_free = is_free
+        event.requires_registration = requires_registration
+        event.early_bird_discount = safe_float_parse(early_bird_discount)
+        event.group_discount = safe_float_parse(group_discount)
+        event.member_discount = safe_float_parse(member_discount)
+        event.registration_deadline = registration_deadline_datetime
+        event.website_url = website_url
+        event.booking_url = booking_url
+        event.facebook_url = facebook_url
+        event.instagram_url = instagram_url
+        event.twitter_url = twitter_url
+        event.linkedin_url = linkedin_url
+        event.youtube_url = youtube_url
+        event.tiktok_url = tiktok_url
+        event.venue_website = venue_website
+        event.partner_url = partner_url
+        event.contact_name = contact_name
+        event.contact_email = contact_email
+        event.contact_phone = contact_phone
+        event.emergency_contact = emergency_contact
+        event.terms_url = terms_url
+        event.privacy_policy_url = privacy_policy_url
+        event.featured_event = featured_event
+        event.send_notifications = send_notifications
+        event.seo_keywords = seo_keywords
+        event.updated_at = datetime.utcnow()
+
+        db.commit()
+        db.refresh(event)
+
+        return RedirectResponse(url=f"/admin/events?updated={event.id}", status_code=HTTP_303_SEE_OTHER)
+
+    except ValueError as e:
+        return templates.TemplateResponse("edit_event.html", {
+            "request": request,
+            "current_user": user,
+            "event": event,
+            "error": f"Invalid date format: {str(e)}",
+            "csrf_token": generate_csrf_token()
+        })
+    except Exception as e:
+        return templates.TemplateResponse("edit_event.html", {
+            "request": request,
+            "current_user": user,
+            "event": event,
+            "error": f"Error updating event: {str(e)}",
+            "csrf_token": generate_csrf_token()
+        })
 
 @app.post("/admin/events/{event_id}/delete", response_class=HTMLResponse)
 async def delete_event(
@@ -1685,14 +2478,19 @@ def send_email(to_email, subject, body):
             server.login(SMTP_USER, SMTP_PASS)
         server.sendmail(msg["From"], [to_email], msg.as_string())
 
-@app.get("/children", response_class=HTMLResponse)
-async def children_get(request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+# ============================================================================
+# FAMILY MANAGEMENT ROUTES
+# ============================================================================
+
+@app.get("/family", response_class=HTMLResponse)
+async def family_get(request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     children = db.query(Child).filter(Child.user_id == user.id).all()
-    return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": None, "csrf_token": generate_csrf_token()})
+    adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+    return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": None, "csrf_token": generate_csrf_token()})
 
-@app.post("/children/add", response_class=HTMLResponse)
+@app.post("/family/children/add", response_class=HTMLResponse)
 async def add_child(
     request: Request,
     db: Session = Depends(get_db),
@@ -1703,13 +2501,20 @@ async def add_child(
     notes: str = Form(None),
     needs_assisting_adult: bool = Form(False),
     other_info: str = Form(None),
+    date_of_birth: str = Form(None),
+    school_year: str = Form(None),
+    emergency_contact_name: str = Form(None),
+    emergency_contact_phone: str = Form(None),
+    emergency_contact_relationship: str = Form(None),
+    medical_conditions: str = Form(None),
     csrf_token: str = Form(None)
 ):
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     if not csrf_token or not verify_csrf_token(csrf_token):
         children = db.query(Child).filter(Child.user_id == user.id).all()
-        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
     
     # Check for duplicate children
     existing_child = db.query(Child).filter(
@@ -1719,24 +2524,41 @@ async def add_child(
     
     if existing_child:
         children = db.query(Child).filter(Child.user_id == user.id).all()
-        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": f"A child named '{name.strip()}' already exists.", "csrf_token": generate_csrf_token()})
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": f"A child named '{name.strip()}' already exists.", "csrf_token": generate_csrf_token()})
+    
+    # Parse date_of_birth if provided
+    dob = None
+    if date_of_birth:
+        try:
+            from datetime import datetime
+            dob = datetime.strptime(date_of_birth, '%Y-%m-%d')
+        except ValueError:
+            pass
     
     child = Child(
         user_id=user.id,
         name=name.strip(),
         age=age,
+        date_of_birth=dob,
+        school_year=school_year,
         allergies=allergies,
+        medical_conditions=medical_conditions,
         notes=notes,
         needs_assisting_adult=needs_assisting_adult,
+        emergency_contact_name=emergency_contact_name,
+        emergency_contact_phone=emergency_contact_phone,
+        emergency_contact_relationship=emergency_contact_relationship,
         other_info=other_info
     )
     db.add(child)
     db.commit()
     
     children = db.query(Child).filter(Child.user_id == user.id).all()
-    return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": f"Child '{name.strip()}' added successfully!", "error": None, "csrf_token": generate_csrf_token()})
+    adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+    return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": f"Child '{name.strip()}' added successfully!", "error": None, "csrf_token": generate_csrf_token()})
 
-@app.post("/children/{child_id}/edit", response_class=HTMLResponse)
+@app.post("/family/children/{child_id}/edit", response_class=HTMLResponse)
 async def edit_child(
     request: Request,
     child_id: int,
@@ -1754,12 +2576,14 @@ async def edit_child(
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     if not csrf_token or not verify_csrf_token(csrf_token):
         children = db.query(Child).filter(Child.user_id == user.id).all()
-        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
     
     child = db.query(Child).filter(Child.id == child_id, Child.user_id == user.id).first()
     if not child:
         children = db.query(Child).filter(Child.user_id == user.id).all()
-        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": "Child not found.", "csrf_token": generate_csrf_token()})
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": "Child not found.", "csrf_token": generate_csrf_token()})
     
     # Check for duplicate names (excluding current child)
     existing_child = db.query(Child).filter(
@@ -1770,7 +2594,8 @@ async def edit_child(
     
     if existing_child:
         children = db.query(Child).filter(Child.user_id == user.id).all()
-        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": f"A child named '{name.strip()}' already exists.", "csrf_token": generate_csrf_token()})
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": f"A child named '{name.strip()}' already exists.", "csrf_token": generate_csrf_token()})
     
     child.name = name.strip()
     child.age = age
@@ -1781,9 +2606,10 @@ async def edit_child(
     db.commit()
     
     children = db.query(Child).filter(Child.user_id == user.id).all()
-    return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": f"Child '{name.strip()}' updated successfully!", "error": None, "csrf_token": generate_csrf_token()})
+    adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+    return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": f"Child '{name.strip()}' updated successfully!", "error": None, "csrf_token": generate_csrf_token()})
 
-@app.post("/children/{child_id}/delete", response_class=HTMLResponse)
+@app.post("/family/children/{child_id}/delete", response_class=HTMLResponse)
 async def delete_child(
     request: Request,
     child_id: int,
@@ -1795,12 +2621,14 @@ async def delete_child(
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     if not csrf_token or not verify_csrf_token(csrf_token):
         children = db.query(Child).filter(Child.user_id == user.id).all()
-        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
     
     child = db.query(Child).filter(Child.id == child_id, Child.user_id == user.id).first()
     if not child:
         children = db.query(Child).filter(Child.user_id == user.id).all()
-        return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": None, "error": "Child not found.", "csrf_token": generate_csrf_token()})
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": "Child not found.", "csrf_token": generate_csrf_token()})
     
     child_name = child.name
     # Delete associated bookings first
@@ -1809,7 +2637,176 @@ async def delete_child(
     db.commit()
     
     children = db.query(Child).filter(Child.user_id == user.id).all()
-    return templates.TemplateResponse("children.html", {"request": request, "user": user, "children": children, "success": f"Child '{child_name}' deleted successfully!", "error": None, "csrf_token": generate_csrf_token()})
+    adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+    return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": f"Child '{child_name}' deleted successfully!", "error": None, "csrf_token": generate_csrf_token()})
+
+# ============================================================================
+# ADULT MANAGEMENT ROUTES
+# ============================================================================
+
+@app.post("/family/adults/add", response_class=HTMLResponse)
+async def add_adult(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    name: str = Form(...),
+    relationship_to_family: str = Form(None),
+    phone: str = Form(None),
+    email: str = Form(None),
+    date_of_birth: str = Form(None),
+    allergies: str = Form(None),
+    medical_conditions: str = Form(None),
+    emergency_contact_name: str = Form(None),
+    emergency_contact_phone: str = Form(None),
+    emergency_contact_relationship: str = Form(None),
+    supervision_qualifications: str = Form(None),
+    volunteer_skills: str = Form(None),
+    notes: str = Form(None),
+    can_supervise_children: bool = Form(False),
+    willing_to_volunteer: bool = Form(False),
+    csrf_token: str = Form(None)
+):
+    if not user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
+    
+    # Check for duplicate adults
+    existing_adult = db.query(Adult).filter(
+        Adult.user_id == user.id,
+        Adult.name.ilike(name.strip())
+    ).first()
+    
+    if existing_adult:
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": f"An adult named '{name.strip()}' already exists.", "csrf_token": generate_csrf_token()})
+    
+    # Parse date_of_birth if provided
+    dob = None
+    if date_of_birth:
+        try:
+            from datetime import datetime
+            dob = datetime.strptime(date_of_birth, '%Y-%m-%d')
+        except ValueError:
+            pass
+    
+    adult = Adult(
+        user_id=user.id,
+        name=name.strip(),
+        relationship_to_family=relationship_to_family,
+        phone=phone,
+        email=email,
+        date_of_birth=dob,
+        allergies=allergies,
+        medical_conditions=medical_conditions,
+        emergency_contact_name=emergency_contact_name,
+        emergency_contact_phone=emergency_contact_phone,
+        emergency_contact_relationship=emergency_contact_relationship,
+        supervision_qualifications=supervision_qualifications,
+        volunteer_skills=volunteer_skills,
+        notes=notes,
+        can_supervise_children=can_supervise_children,
+        willing_to_volunteer=willing_to_volunteer
+    )
+    db.add(adult)
+    db.commit()
+    
+    children = db.query(Child).filter(Child.user_id == user.id).all()
+    adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+    return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": f"Adult '{name.strip()}' added successfully!", "error": None, "csrf_token": generate_csrf_token()})
+
+@app.post("/family/adults/{adult_id}/edit", response_class=HTMLResponse)
+async def edit_adult(
+    request: Request,
+    adult_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    name: str = Form(...),
+    relationship_to_family: str = Form(None),
+    phone: str = Form(None),
+    email: str = Form(None),
+    allergies: str = Form(None),
+    medical_conditions: str = Form(None),
+    supervision_qualifications: str = Form(None),
+    notes: str = Form(None),
+    can_supervise_children: bool = Form(False),
+    willing_to_volunteer: bool = Form(False),
+    csrf_token: str = Form(None)
+):
+    if not user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
+    
+    adult = db.query(Adult).filter(Adult.id == adult_id, Adult.user_id == user.id).first()
+    if not adult:
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": "Adult not found.", "csrf_token": generate_csrf_token()})
+    
+    # Check for duplicate names (excluding current adult)
+    existing_adult = db.query(Adult).filter(
+        Adult.user_id == user.id,
+        Adult.name.ilike(name.strip()),
+        Adult.id != adult_id
+    ).first()
+    
+    if existing_adult:
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": f"An adult named '{name.strip()}' already exists.", "csrf_token": generate_csrf_token()})
+    
+    adult.name = name.strip()
+    adult.relationship_to_family = relationship_to_family
+    adult.phone = phone
+    adult.email = email
+    adult.allergies = allergies
+    adult.medical_conditions = medical_conditions
+    adult.supervision_qualifications = supervision_qualifications
+    adult.notes = notes
+    adult.can_supervise_children = can_supervise_children
+    adult.willing_to_volunteer = willing_to_volunteer
+    db.commit()
+    
+    children = db.query(Child).filter(Child.user_id == user.id).all()
+    adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+    return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": f"Adult '{name.strip()}' updated successfully!", "error": None, "csrf_token": generate_csrf_token()})
+
+@app.post("/family/adults/{adult_id}/delete", response_class=HTMLResponse)
+async def delete_adult(
+    request: Request,
+    adult_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    csrf_token: str = Form(None)
+):
+    if not user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": "Invalid or missing CSRF token.", "csrf_token": generate_csrf_token()})
+    
+    adult = db.query(Adult).filter(Adult.id == adult_id, Adult.user_id == user.id).first()
+    if not adult:
+        children = db.query(Child).filter(Child.user_id == user.id).all()
+        adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+        return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": None, "error": "Adult not found.", "csrf_token": generate_csrf_token()})
+    
+    adult_name = adult.name
+    # Delete associated adult bookings first
+    db.query(AdultBooking).filter(AdultBooking.adult_id == adult_id).delete()
+    db.delete(adult)
+    db.commit()
+    
+    children = db.query(Child).filter(Child.user_id == user.id).all()
+    adults = db.query(Adult).filter(Adult.user_id == user.id).all()
+    return templates.TemplateResponse("family.html", {"request": request, "user": user, "children": children, "adults": adults, "success": f"Adult '{adult_name}' deleted successfully!", "error": None, "csrf_token": generate_csrf_token()})
 
 @app.get("/gallery", response_class=HTMLResponse)
 async def gallery_page(request: Request, db: Session = Depends(get_db)):
@@ -1892,7 +2889,8 @@ async def edit_gallery_image(
 async def admin_all_events(request: Request, user: User = Depends(require_admin), db: Session = Depends(get_db)):
     # Get all events with their bookings and related data
     events = db.query(Event).options(
-        joinedload(Event.bookings).joinedload(Booking.child).joinedload(Child.user)
+        joinedload(Event.bookings).joinedload(Booking.child).joinedload(Child.user),
+        joinedload(Event.adult_bookings).joinedload(AdultBooking.adult).joinedload(Adult.user)
     ).order_by(Event.date.desc()).all()
     
     from datetime import datetime, timedelta
@@ -1911,7 +2909,8 @@ async def admin_all_events(request: Request, user: User = Depends(require_admin)
 async def admin_events_calendar(request: Request, user: User = Depends(require_admin), db: Session = Depends(get_db)):
     # Get all events with their bookings
     events = db.query(Event).options(
-        joinedload(Event.bookings).joinedload(Booking.child).joinedload(Child.user)
+        joinedload(Event.bookings).joinedload(Booking.child).joinedload(Child.user),
+        joinedload(Event.adult_bookings).joinedload(AdultBooking.adult).joinedload(Adult.user)
     ).order_by(Event.date).all()
     
     from datetime import datetime
@@ -1966,7 +2965,8 @@ async def admin_events_calendar(request: Request, user: User = Depends(require_a
 async def admin_event_bookings(request: Request, event_id: int, user: User = Depends(require_admin), db: Session = Depends(get_db)):
     # Get the specific event with all its bookings
     event = db.query(Event).options(
-        joinedload(Event.bookings).joinedload(Booking.child).joinedload(Child.user)
+        joinedload(Event.bookings).joinedload(Booking.child).joinedload(Child.user),
+        joinedload(Event.adult_bookings).joinedload(AdultBooking.adult).joinedload(Adult.user)
     ).filter(Event.id == event_id).first()
     
     if not event:

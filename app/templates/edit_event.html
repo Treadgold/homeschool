@@ -1,0 +1,601 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Event - {{ event.title }} - LifeLearners.org.nz{% endblock %}
+
+{% block extra_head %}
+<style>
+    .edit-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+    .edit-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    .edit-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #2d3748;
+    }
+    .edit-subtitle {
+        color: #718096;
+        margin-top: 0.5rem;
+    }
+    .form-sections {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+    }
+    .form-section {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border: 1px solid #e2e8f0;
+    }
+    .section-title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: #4a5568;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        border-color: #4299e1;
+        box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+        outline: none;
+    }
+    .form-group textarea {
+        resize: vertical;
+        min-height: 100px;
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+    .checkbox-group input[type="checkbox"] {
+        width: auto;
+    }
+    .btn {
+        padding: 0.75rem 2rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-block;
+        text-align: center;
+    }
+    .btn-primary {
+        background: #4299e1;
+        color: white;
+    }
+    .btn-primary:hover {
+        background: #3182ce;
+        transform: translateY(-1px);
+    }
+    .btn-secondary {
+        background: #e2e8f0;
+        color: #4a5568;
+    }
+    .btn-secondary:hover {
+        background: #cbd5e0;
+    }
+    .btn-success {
+        background: #38a169;
+        color: white;
+    }
+    .btn-success:hover {
+        background: #2f855a;
+    }
+    .form-actions {
+        grid-column: 1 / -1;
+        display: flex;
+        gap: 1rem;
+        justify-content: space-between;
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+    }
+    .error-message {
+        background: #fed7d7;
+        border: 1px solid #e53e3e;
+        color: #c53030;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+    .current-image {
+        max-width: 200px;
+        max-height: 150px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        margin-top: 0.5rem;
+    }
+    .field-help {
+        font-size: 0.8rem;
+        color: #718096;
+        margin-top: 0.25rem;
+    }
+    .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+    }
+    .status-draft {
+        color: #e53e3e;
+    }
+    .status-published {
+        color: #38a169;
+    }
+    
+    @media (max-width: 768px) {
+        .form-sections {
+            grid-template-columns: 1fr;
+        }
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="edit-container">
+    <div class="edit-header">
+        <div>
+            <h1 class="edit-title">Edit Event</h1>
+            <div class="edit-subtitle">
+                <div class="status-indicator">
+                    {% if event.status == 'draft' %}
+                        <span class="status-draft">● Draft</span>
+                    {% else %}
+                        <span class="status-published">● Published</span>
+                    {% endif %}
+                    <span>Created {{ event.created_at.strftime('%d %b %Y') }}</span>
+                    {% if event.updated_at != event.created_at %}
+                        <span>• Updated {{ event.updated_at.strftime('%d %b %Y') }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div>
+            <a href="/admin/events" class="btn btn-secondary">← Back to Events</a>
+            <a href="/event/{{ event.id }}" class="btn btn-primary" target="_blank">View Event</a>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="error-message">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        
+        <div class="form-sections">
+            <!-- Basic Information -->
+            <div class="form-section">
+                <h3 class="section-title">📝 Basic Information</h3>
+                
+                <div class="form-group">
+                    <label for="title">Event Title *</label>
+                    <input type="text" name="title" id="title" value="{{ event.title }}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="subtitle">Subtitle</label>
+                    <input type="text" name="subtitle" id="subtitle" value="{{ event.subtitle or '' }}">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="event_type">Event Type *</label>
+                        <select name="event_type" id="event_type" required>
+                            <option value="">Select type</option>
+                            <option value="educational_trip" {% if event.event_type == 'educational_trip' %}selected{% endif %}>Educational Trip</option>
+                            <option value="workshop" {% if event.event_type == 'workshop' %}selected{% endif %}>Workshop</option>
+                            <option value="sport_event" {% if event.event_type == 'sport_event' %}selected{% endif %}>Sport Event</option>
+                            <option value="social_gathering" {% if event.event_type == 'social_gathering' %}selected{% endif %}>Social Gathering</option>
+                            <option value="academic_session" {% if event.event_type == 'academic_session' %}selected{% endif %}>Academic Session</option>
+                            <option value="outdoor_adventure" {% if event.event_type == 'outdoor_adventure' %}selected{% endif %}>Outdoor Adventure</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="status">Status</label>
+                        <select name="status" id="status">
+                            <option value="draft" {% if event.status == 'draft' %}selected{% endif %}>Draft</option>
+                            <option value="published" {% if event.status == 'published' %}selected{% endif %}>Published</option>
+                            <option value="cancelled" {% if event.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="short_description">Short Description *</label>
+                    <textarea name="short_description" id="short_description" rows="3" placeholder="Brief description for listings" required>{{ event.short_description or '' }}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Full Description</label>
+                    <textarea name="description" id="description" rows="5" placeholder="Detailed event description">{{ event.description or '' }}</textarea>
+                </div>
+            </div>
+
+            <!-- Date & Time -->
+            <div class="form-section">
+                <h3 class="section-title">📅 Date & Time</h3>
+                
+                <div class="form-group">
+                    <label for="start_date">Start Date & Time *</label>
+                    <input type="datetime-local" name="start_date" id="start_date" 
+                           value="{{ event.date.strftime('%Y-%m-%dT%H:%M') if event.date }}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="end_date">End Date & Time</label>
+                    <input type="datetime-local" name="end_date" id="end_date" 
+                           value="{{ event.end_date.strftime('%Y-%m-%dT%H:%M') if event.end_date }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="timezone">Timezone</label>
+                    <select name="timezone" id="timezone">
+                        <option value="Pacific/Auckland" {% if event.timezone == 'Pacific/Auckland' %}selected{% endif %}>Auckland (NZST/NZDT)</option>
+                        <option value="Pacific/Chatham" {% if event.timezone == 'Pacific/Chatham' %}selected{% endif %}>Chatham Islands</option>
+                        <option value="UTC" {% if event.timezone == 'UTC' %}selected{% endif %}>UTC</option>
+                    </select>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" name="is_recurring" id="is_recurring" {% if event.is_recurring %}checked{% endif %}>
+                    <label for="is_recurring">Recurring Event</label>
+                </div>
+            </div>
+
+            <!-- Location & Format -->
+            <div class="form-section">
+                <h3 class="section-title">📍 Location & Format</h3>
+                
+                <div class="form-group">
+                    <label for="event_format">Event Format *</label>
+                    <select name="event_format" id="event_format" required>
+                        <option value="">Select format</option>
+                        <option value="in-person" {% if event.event_format == 'in-person' %}selected{% endif %}>In-Person</option>
+                        <option value="online" {% if event.event_format == 'online' %}selected{% endif %}>Online</option>
+                        <option value="hybrid" {% if event.event_format == 'hybrid' %}selected{% endif %}>Hybrid</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="venue_name">Venue Name</label>
+                    <input type="text" name="venue_name" id="venue_name" value="{{ event.venue_name or '' }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="address">Address</label>
+                    <input type="text" name="address" id="address" value="{{ event.address or '' }}">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="city">City</label>
+                        <input type="text" name="city" id="city" value="{{ event.city or '' }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="zip_code">Postcode</label>
+                        <input type="text" name="zip_code" id="zip_code" value="{{ event.zip_code or '' }}" 
+                               maxlength="4" pattern="[0-9]{4}" placeholder="e.g. 1010">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="state">Region</label>
+                        <select name="state" id="state">
+                            <option value="">Select region</option>
+                            <option value="Auckland" {% if event.state == 'Auckland' %}selected{% endif %}>Auckland</option>
+                            <option value="Bay of Plenty" {% if event.state == 'Bay of Plenty' %}selected{% endif %}>Bay of Plenty</option>
+                            <option value="Canterbury" {% if event.state == 'Canterbury' %}selected{% endif %}>Canterbury</option>
+                            <option value="Gisborne" {% if event.state == 'Gisborne' %}selected{% endif %}>Gisborne</option>
+                            <option value="Hawke's Bay" {% if event.state == "Hawke's Bay" %}selected{% endif %}>Hawke's Bay</option>
+                            <option value="Manawatu-Wanganui" {% if event.state == 'Manawatu-Wanganui' %}selected{% endif %}>Manawatu-Wanganui</option>
+                            <option value="Marlborough" {% if event.state == 'Marlborough' %}selected{% endif %}>Marlborough</option>
+                            <option value="Nelson" {% if event.state == 'Nelson' %}selected{% endif %}>Nelson</option>
+                            <option value="Northland" {% if event.state == 'Northland' %}selected{% endif %}>Northland</option>
+                            <option value="Otago" {% if event.state == 'Otago' %}selected{% endif %}>Otago</option>
+                            <option value="Southland" {% if event.state == 'Southland' %}selected{% endif %}>Southland</option>
+                            <option value="Taranaki" {% if event.state == 'Taranaki' %}selected{% endif %}>Taranaki</option>
+                            <option value="Tasman" {% if event.state == 'Tasman' %}selected{% endif %}>Tasman</option>
+                            <option value="Waikato" {% if event.state == 'Waikato' %}selected{% endif %}>Waikato</option>
+                            <option value="Wellington" {% if event.state == 'Wellington' %}selected{% endif %}>Wellington</option>
+                            <option value="West Coast" {% if event.state == 'West Coast' %}selected{% endif %}>West Coast</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="country">Country</label>
+                        <input type="text" name="country" id="country" value="{{ event.country or 'New Zealand' }}" readonly>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Participants & Requirements -->
+            <div class="form-section">
+                <h3 class="section-title">👥 Participants & Requirements</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="max_participants">Max Participants</label>
+                        <input type="number" name="max_participants" id="max_participants" 
+                               value="{{ event.max_participants or '' }}" min="1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="language">Language</label>
+                        <select name="language" id="language">
+                            <option value="english" {% if event.language == 'english' %}selected{% endif %}>English</option>
+                            <option value="maori" {% if event.language == 'maori' %}selected{% endif %}>Te Reo Māori</option>
+                            <option value="bilingual" {% if event.language == 'bilingual' %}selected{% endif %}>Bilingual</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="min_age">Minimum Age</label>
+                        <input type="number" name="min_age" id="min_age" 
+                               value="{{ event.min_age or '' }}" min="0" max="18">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="max_age">Maximum Age</label>
+                        <input type="number" name="max_age" id="max_age" 
+                               value="{{ event.max_age or '' }}" min="0" max="18">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="what_to_bring">What to Bring</label>
+                    <textarea name="what_to_bring" id="what_to_bring" rows="3">{{ event.what_to_bring or '' }}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="accessibility_info">Accessibility Information</label>
+                    <textarea name="accessibility_info" id="accessibility_info" rows="3">{{ event.accessibility_info or '' }}</textarea>
+                </div>
+            </div>
+
+            <!-- Online Meeting Info -->
+            <div class="form-section">
+                <h3 class="section-title">💻 Online Meeting Info</h3>
+                
+                <div class="form-group">
+                    <label for="meeting_id">Meeting Link/ID</label>
+                    <input type="url" name="meeting_id" id="meeting_id" value="{{ event.meeting_id or '' }}" 
+                           placeholder="https://zoom.us/j/...">
+                </div>
+                
+                <div class="form-group">
+                    <label for="meeting_password">Meeting Password</label>
+                    <input type="text" name="meeting_password" id="meeting_password" value="{{ event.meeting_password or '' }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="video_url">Video/Recording URL</label>
+                    <input type="url" name="video_url" id="video_url" value="{{ event.video_url or '' }}">
+                </div>
+            </div>
+
+            <!-- Pricing & Registration -->
+            <div class="form-section">
+                <h3 class="section-title">💰 Pricing & Registration</h3>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" name="is_free" id="is_free" {% if event.is_free %}checked{% endif %}>
+                    <label for="is_free">Free Event</label>
+                </div>
+                
+                <div class="form-group">
+                    <label for="cost">Cost (NZD)</label>
+                    <input type="number" name="cost" id="cost" step="0.01" min="0" 
+                           value="{{ event.cost or '' }}" placeholder="0.00">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="early_bird_discount">Early Bird Discount (%)</label>
+                        <input type="number" name="early_bird_discount" id="early_bird_discount" 
+                               value="{{ event.early_bird_discount or '' }}" min="0" max="100" step="0.1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="group_discount">Group Discount (%)</label>
+                        <input type="number" name="group_discount" id="group_discount" 
+                               value="{{ event.group_discount or '' }}" min="0" max="100" step="0.1">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="registration_deadline">Registration Deadline</label>
+                    <input type="datetime-local" name="registration_deadline" id="registration_deadline" 
+                           value="{{ event.registration_deadline.strftime('%Y-%m-%dT%H:%M') if event.registration_deadline }}">
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" name="requires_registration" id="requires_registration" 
+                           {% if event.requires_registration %}checked{% endif %}>
+                    <label for="requires_registration">Requires Registration</label>
+                </div>
+            </div>
+
+            <!-- Content & Media -->
+            <div class="form-section">
+                <h3 class="section-title">📸 Content & Media</h3>
+                
+                <div class="form-group">
+                    <label for="featured_image">Featured Image</label>
+                    <input type="file" name="featured_image" id="featured_image" accept="image/*">
+                    {% if event.image_url %}
+                    <div class="field-help">Current image:</div>
+                    <img src="{{ event.image_url }}" class="current-image" alt="Current event image">
+                    {% endif %}
+                </div>
+                
+                <div class="form-group">
+                    <label for="event_agenda">Event Agenda</label>
+                    <textarea name="event_agenda" id="event_agenda" rows="4">{{ event.event_agenda or '' }}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="speaker_info">Speaker/Facilitator Info</label>
+                    <textarea name="speaker_info" id="speaker_info" rows="3">{{ event.speaker_info or '' }}</textarea>
+                </div>
+            </div>
+
+            <!-- Contact & Links -->
+            <div class="form-section">
+                <h3 class="section-title">📞 Contact & Links</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact_name">Contact Name</label>
+                        <input type="text" name="contact_name" id="contact_name" value="{{ event.contact_name or '' }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="contact_email">Contact Email</label>
+                        <input type="email" name="contact_email" id="contact_email" value="{{ event.contact_email or '' }}">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="contact_phone">Contact Phone</label>
+                    <input type="tel" name="contact_phone" id="contact_phone" value="{{ event.contact_phone or '' }}"
+                           placeholder="09 123 4567 or 021 123 456">
+                </div>
+                
+                <div class="form-group">
+                    <label for="website_url">Website URL</label>
+                    <input type="url" name="website_url" id="website_url" value="{{ event.website_url or '' }}">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="facebook_url">Facebook URL</label>
+                        <input type="url" name="facebook_url" id="facebook_url" value="{{ event.facebook_url or '' }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="instagram_url">Instagram URL</label>
+                        <input type="url" name="instagram_url" id="instagram_url" value="{{ event.instagram_url or '' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Options -->
+            <div class="form-section">
+                <h3 class="section-title">⚙️ Advanced Options</h3>
+                
+                <div class="form-group">
+                    <label for="seo_keywords">SEO Keywords</label>
+                    <input type="text" name="seo_keywords" id="seo_keywords" value="{{ event.seo_keywords or '' }}"
+                           placeholder="education, kids, workshop, auckland">
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" name="featured_event" id="featured_event" {% if event.featured_event %}checked{% endif %}>
+                    <label for="featured_event">Featured Event</label>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" name="send_notifications" id="send_notifications" 
+                           {% if event.send_notifications %}checked{% endif %}>
+                    <label for="send_notifications">Send Notifications</label>
+                </div>
+                
+                <div class="form-group">
+                    <label for="rich_description">Rich Description (HTML)</label>
+                    <textarea name="rich_description" id="rich_description" rows="4">{{ event.rich_description or '' }}</textarea>
+                    <div class="field-help">You can use HTML tags for formatting</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <div>
+                <a href="/admin/events" class="btn btn-secondary">Cancel</a>
+            </div>
+            <div style="display: flex; gap: 1rem;">
+                <button type="submit" name="status" value="draft" class="btn btn-secondary">Save as Draft</button>
+                <button type="submit" name="status" value="published" class="btn btn-success">Update & Publish</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+// Auto-hide pricing fields if free event is checked
+document.getElementById('is_free').addEventListener('change', function() {
+    const costField = document.getElementById('cost');
+    const discountFields = [
+        document.getElementById('early_bird_discount'),
+        document.getElementById('group_discount')
+    ];
+    
+    if (this.checked) {
+        costField.value = '';
+        costField.disabled = true;
+        discountFields.forEach(field => {
+            field.value = '';
+            field.disabled = true;
+        });
+    } else {
+        costField.disabled = false;
+        discountFields.forEach(field => field.disabled = false);
+    }
+});
+
+// Trigger on page load
+document.getElementById('is_free').dispatchEvent(new Event('change'));
+</script>
+{% endblock %} 

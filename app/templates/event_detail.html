@@ -1,33 +1,781 @@
 {% extends "base.html" %}
 {% block title %}{{ event.title }} – LifeLearners.org.nz{% endblock %}
-{% block extra_head %}{% endblock %}
+{% block extra_head %}
+<style>
+    .event-hero {
+        position: relative;
+        background: linear-gradient(135deg, #2b6cb0 0%, #3182ce 100%);
+        color: white;
+        padding: 3rem 0;
+        margin-bottom: 2rem;
+        overflow: hidden;
+    }
+    
+    .event-hero::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.3);
+        z-index: 1;
+    }
+    
+    .event-hero-content {
+        position: relative;
+        z-index: 2;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 2rem;
+    }
+    
+    .event-hero.with-image {
+        background-image: url('{{ event.image_url }}');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        min-height: 400px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .event-title-main {
+        font-size: 3rem;
+        font-weight: 700;
+        margin: 0 0 0.5rem 0;
+        line-height: 1.2;
+    }
+    
+    .event-subtitle {
+        font-size: 1.3rem;
+        opacity: 0.9;
+        margin: 0 0 1rem 0;
+        font-weight: 300;
+    }
+    
+    .event-quick-meta {
+        display: flex;
+        gap: 2rem;
+        flex-wrap: wrap;
+        font-size: 1.1rem;
+    }
+    
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .meta-icon {
+        font-size: 1.3rem;
+    }
+    
+    .event-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 2rem;
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 3rem;
+        margin-bottom: 3rem;
+    }
+    
+    .main-content {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+    }
+    
+    .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    
+    .content-section {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+    }
+    
+    .section-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #2b6cb0;
+        margin: 0 0 1rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .section-icon {
+        font-size: 1.3rem;
+    }
+    
+    .description-content {
+        line-height: 1.7;
+        font-size: 1.1rem;
+        color: #495057;
+    }
+    
+    .details-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .detail-item {
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #2b6cb0;
+    }
+    
+    .detail-label {
+        font-weight: 600;
+        color: #495057;
+        font-size: 0.9rem;
+        margin-bottom: 0.3rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .detail-value {
+        color: #2b6cb0;
+        font-weight: 500;
+        font-size: 1.1rem;
+    }
+    
+    .booking-card {
+        background: linear-gradient(135deg, #28a745 0%, #34ce57 100%);
+        color: white;
+        text-align: center;
+        position: sticky;
+        top: 2rem;
+    }
+    
+    .booking-price {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .booking-price .currency {
+        font-size: 1.2rem;
+        opacity: 0.8;
+    }
+    
+    .booking-capacity {
+        margin: 1rem 0;
+        padding: 0.5rem;
+        background: rgba(255,255,255,0.2);
+        border-radius: 6px;
+        font-size: 0.9rem;
+    }
+    
+    .booking-btn {
+        background: white;
+        color: #28a745;
+        font-weight: 600;
+        font-size: 1.1rem;
+        padding: 0.8rem 2rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-decoration: none;
+        display: inline-block;
+        width: 100%;
+        margin-top: 1rem;
+    }
+    
+    .booking-btn:hover {
+        background: #f8f9fa;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .contact-card {
+        background: #e8f4fd;
+        border: 1px solid #2b6cb0;
+    }
+    
+    .contact-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0.5rem 0;
+        color: #495057;
+    }
+    
+    .contact-item a {
+        color: #2b6cb0;
+        text-decoration: none;
+    }
+    
+    .contact-item a:hover {
+        text-decoration: underline;
+    }
+    
+    .requirements-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .requirements-list li {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e9ecef;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .requirements-list li:last-child {
+        border-bottom: none;
+    }
+    
+    .requirement-icon {
+        color: #28a745;
+        margin-top: 0.2rem;
+        flex-shrink: 0;
+    }
+    
+    .back-nav {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1rem 2rem 0;
+    }
+    
+    .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #6c757d;
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.2s;
+    }
+    
+    .back-btn:hover {
+        color: #2b6cb0;
+    }
+    
+    .agenda-timeline {
+        position: relative;
+        padding-left: 2rem;
+    }
+    
+    .agenda-timeline::before {
+        content: '';
+        position: absolute;
+        left: 0.5rem;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #e9ecef;
+    }
+    
+    .agenda-item {
+        position: relative;
+        margin-bottom: 1.5rem;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #2b6cb0;
+    }
+    
+    .agenda-item::before {
+        content: '';
+        position: absolute;
+        left: -1.8rem;
+        top: 1rem;
+        width: 10px;
+        height: 10px;
+        background: #2b6cb0;
+        border-radius: 50%;
+        border: 2px solid white;
+    }
+    
+    .agenda-time {
+        font-weight: 600;
+        color: #2b6cb0;
+        font-size: 0.9rem;
+    }
+    
+    .agenda-title {
+        font-weight: 600;
+        margin: 0.3rem 0;
+    }
+    
+    .social-links {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .social-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        color: #6c757d;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+    
+    .social-link:hover {
+        background: #2b6cb0;
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .video-container {
+        position: relative;
+        width: 100%;
+        height: 0;
+        padding-bottom: 56.25%; /* 16:9 aspect ratio */
+        overflow: hidden;
+        border-radius: 8px;
+        background: #000;
+    }
+    
+    .video-container iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+    
+    @media (max-width: 768px) {
+        .event-content {
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            padding: 0 1rem;
+        }
+        
+        .event-hero-content {
+            padding: 0 1rem;
+        }
+        
+        .event-title-main {
+            font-size: 2rem;
+        }
+        
+        .event-quick-meta {
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .details-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .booking-card {
+            position: static;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-    <div class="event-title">{{ event.title }}</div>
-    {% if event.image_url %}
-        <img src="{{ event.image_url }}" alt="Event image" class="event-image">
-    {% endif %}
-    <div class="event-meta">
-        {{ event.date.strftime('%Y-%m-%d %H:%M') }}
-        {% if event.location %}| {{ event.location }}{% endif %}
+<!-- Back Navigation -->
+<div class="back-nav">
+    <a href="/events" class="back-btn">
+        <span>←</span> Back to Events
+    </a>
+</div>
+
+<!-- Event Hero Section -->
+<div class="event-hero {% if event.image_url %}with-image{% endif %}">
+    <div class="event-hero-content">
+        <h1 class="event-title-main">{{ event.title }}</h1>
+        {% if event.subtitle %}
+        <p class="event-subtitle">{{ event.subtitle }}</p>
+        {% endif %}
+        
+        <div class="event-quick-meta">
+            <div class="meta-item">
+                <span class="meta-icon">📅</span>
+                <span>{{ event.date.strftime('%A, %B %d, %Y') }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-icon">🕐</span>
+                <span>{{ event.date.strftime('%I:%M %p') }}{% if event.end_date %} - {{ event.end_date.strftime('%I:%M %p') }}{% endif %}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-icon">📍</span>
+                <span>{{ event.location or event.venue_name or 'Location TBD' }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-icon">🎯</span>
+                <span>{{ event.event_type|capitalize|replace('_', ' ') }} Event</span>
+            </div>
+        </div>
     </div>
-    <div class="event-desc">{{ event.description }}</div>
-    <div class="event-details">
-        {% if event.cost is not none %}
-            <div class="event-detail">Cost: ${{ '%.2f' % event.cost }}</div>
+</div>
+
+<!-- Main Content -->
+<div class="event-content">
+    <div class="main-content">
+        <!-- Description -->
+        {% if event.description or event.short_description %}
+        <div class="content-section">
+            <h2 class="section-title">
+                <span class="section-icon">📝</span>
+                About This Event
+            </h2>
+            <div class="description-content">
+                {{ event.description or event.short_description }}
+            </div>
+        </div>
         {% endif %}
-        {% if event.max_pupils %}
-            <div class="event-detail">Max pupils: {{ event.max_pupils }}</div>
+        
+        <!-- Event Details -->
+        <div class="content-section">
+            <h2 class="section-title">
+                <span class="section-icon">ℹ️</span>
+                Event Details
+            </h2>
+            <div class="details-grid">
+                {% if event.date %}
+                <div class="detail-item">
+                    <div class="detail-label">Date & Time</div>
+                    <div class="detail-value">
+                        {{ event.date.strftime('%B %d, %Y') }}<br>
+                        {{ event.date.strftime('%I:%M %p') }}{% if event.end_date %} - {{ event.end_date.strftime('%I:%M %p') }}{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if event.location or event.venue_name %}
+                <div class="detail-item">
+                    <div class="detail-label">Location</div>
+                    <div class="detail-value">
+                        {{ event.venue_name or event.location }}
+                        {% if event.address %}<br><small style="opacity: 0.8;">{{ event.address }}</small>{% endif %}
+                        {% if event.city %}<br><small style="opacity: 0.8;">{{ event.city }}{% if event.state %}, {{ event.state }}{% endif %}</small>{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if event.event_format %}
+                <div class="detail-item">
+                    <div class="detail-label">Event Format</div>
+                    <div class="detail-value">{{ event.event_format|capitalize|replace('_', ' ') }}</div>
+                </div>
+                {% endif %}
+                
+                {% if event.min_age or event.max_age or event.recommended_age %}
+                <div class="detail-item">
+                    <div class="detail-label">Age Group</div>
+                    <div class="detail-value">
+                        {% if event.min_age and event.max_age %}
+                            Ages {{ event.min_age }}-{{ event.max_age }}
+                        {% elif event.recommended_age %}
+                            {{ event.recommended_age }}+ years
+                        {% elif event.min_age %}
+                            {{ event.min_age }}+ years
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if event.max_pupils or event.max_participants %}
+                <div class="detail-item">
+                    <div class="detail-label">Capacity</div>
+                    <div class="detail-value">{{ event.max_pupils or event.max_participants }} participants</div>
+                </div>
+                {% endif %}
+                
+                {% if event.language %}
+                <div class="detail-item">
+                    <div class="detail-label">Language</div>
+                    <div class="detail-value">{{ event.language|capitalize }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Event Agenda -->
+        {% if event.event_agenda %}
+        <div class="content-section">
+            <h2 class="section-title">
+                <span class="section-icon">📋</span>
+                Event Agenda
+            </h2>
+            <div class="agenda-timeline">
+                {% for line in event.event_agenda.split('\n') %}
+                    {% if line.strip() %}
+                    <div class="agenda-item">
+                        {% if ':' in line %}
+                            {% set time_content = line.split(':', 1) %}
+                            <div class="agenda-time">{{ time_content[0].strip() }}</div>
+                            <div class="agenda-title">{{ time_content[1].strip() }}</div>
+                        {% else %}
+                            <div class="agenda-title">{{ line.strip() }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
         {% endif %}
-        {% if event.min_age is not none and event.max_age is not none %}
-            <div class="event-detail">Ages: {{ event.min_age }}–{{ event.max_age }}</div>
+        
+        <!-- Speaker Info -->
+        {% if event.speaker_info %}
+        <div class="content-section">
+            <h2 class="section-title">
+                <span class="section-icon">👨‍🏫</span>
+                Facilitator/Speaker
+            </h2>
+            <div class="description-content">
+                {{ event.speaker_info }}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- What to Bring & Requirements -->
+        {% if event.what_to_bring or event.requirements or event.dress_code %}
+        <div class="content-section">
+            <h2 class="section-title">
+                <span class="section-icon">🎒</span>
+                What to Bring & Requirements
+            </h2>
+            <ul class="requirements-list">
+                {% if event.what_to_bring %}
+                    {% for item in event.what_to_bring.split('\n') %}
+                        {% if item.strip() %}
+                        <li>
+                            <span class="requirement-icon">✓</span>
+                            <span>{{ item.strip() }}</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+                {% if event.dress_code %}
+                <li>
+                    <span class="requirement-icon">👕</span>
+                    <span><strong>Dress Code:</strong> {{ event.dress_code }}</span>
+                </li>
+                {% endif %}
+                {% if event.requirements %}
+                    {% for item in event.requirements.split('\n') %}
+                        {% if item.strip() %}
+                        <li>
+                            <span class="requirement-icon">📋</span>
+                            <span>{{ item.strip() }}</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+        
+        <!-- Accessibility & Parking -->
+        {% if event.accessibility_info or event.parking_info %}
+        <div class="content-section">
+            <h2 class="section-title">
+                <span class="section-icon">♿</span>
+                Accessibility & Parking
+            </h2>
+            {% if event.accessibility_info %}
+            <div style="margin-bottom: 1rem;">
+                <strong>Accessibility:</strong> {{ event.accessibility_info }}
+            </div>
+            {% endif %}
+            {% if event.parking_info %}
+            <div>
+                <strong>Parking:</strong> {{ event.parking_info }}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- Video -->
+        {% if event.video_url %}
+        <div class="content-section">
+            <h2 class="section-title">
+                <span class="section-icon">🎥</span>
+                Event Preview
+            </h2>
+            <div class="video-container">
+                {% if 'youtube.com' in event.video_url or 'youtu.be' in event.video_url %}
+                    {% set video_id = event.video_url.split('/')[-1].split('?')[0] %}
+                    <iframe src="https://www.youtube.com/embed/{{ video_id }}" frameborder="0" allowfullscreen></iframe>
+                {% else %}
+                    <iframe src="{{ event.video_url }}" frameborder="0" allowfullscreen></iframe>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Policies -->
+        {% if event.cancellation_policy or event.refund_policy %}
+        <div class="content-section">
+            <h2 class="section-title">
+                <span class="section-icon">📜</span>
+                Policies
+            </h2>
+            {% if event.cancellation_policy %}
+            <div style="margin-bottom: 1rem;">
+                <strong>Cancellation Policy:</strong><br>
+                {{ event.cancellation_policy }}
+            </div>
+            {% endif %}
+            {% if event.refund_policy %}
+            <div>
+                <strong>Refund Policy:</strong><br>
+                {{ event.refund_policy }}
+            </div>
+            {% endif %}
+        </div>
         {% endif %}
     </div>
-    <div style="text-align:center;">
-        <a class="cta" href="/">Back to Events</a>
+    
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <!-- Booking Card -->
+        <div class="content-section booking-card">
+            <div class="booking-price">
+                {% if event.cost %}
+                    <span class="currency">$</span>{{ '%.0f' % event.cost }}
+                    {% if event.cost != event.cost|int %}<small>.{{ '{:.2f}'.format(event.cost).split('.')[1] }}</small>{% endif %}
+                {% elif event.is_free %}
+                    FREE
+                {% else %}
+                    TBD
+                {% endif %}
+            </div>
+            
+            {% if event.max_pupils or event.max_participants %}
+            <div class="booking-capacity">
+                {% set max_capacity = event.max_pupils or event.max_participants %}
+                {% set current_bookings = event.bookings|length if event.bookings else 0 %}
+                {{ current_bookings }}/{{ max_capacity }} spots filled
+            </div>
+            {% endif %}
+            
+            {% if event.early_bird_discount %}
+            <div style="background: rgba(255,255,255,0.2); padding: 0.5rem; border-radius: 6px; margin: 1rem 0; font-size: 0.9rem;">
+                🎯 Early bird: {{ event.early_bird_discount }}% off
+            </div>
+            {% endif %}
+            
+            {% if request.state.user %}
+                <a href="/event/{{ event.id }}/book" class="booking-btn">
+                    Book This Event
+                </a>
+            {% else %}
+                <a href="/login?next=/event/{{ event.id }}/book" class="booking-btn">
+                    Login to Book
+                </a>
+            {% endif %}
+            
+            {% if event.registration_deadline %}
+            <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.9;">
+                📅 Registration closes: {{ event.registration_deadline.strftime('%B %d, %Y') }}
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Contact Info -->
+        {% if event.contact_name or event.contact_email or event.contact_phone %}
+        <div class="content-section contact-card">
+            <h3 class="section-title">
+                <span class="section-icon">📞</span>
+                Contact
+            </h3>
+            {% if event.contact_name %}
+            <div class="contact-item">
+                <span>👤</span>
+                <span>{{ event.contact_name }}</span>
+            </div>
+            {% endif %}
+            {% if event.contact_email %}
+            <div class="contact-item">
+                <span>📧</span>
+                <a href="mailto:{{ event.contact_email }}">{{ event.contact_email }}</a>
+            </div>
+            {% endif %}
+            {% if event.contact_phone %}
+            <div class="contact-item">
+                <span>📱</span>
+                <a href="tel:{{ event.contact_phone }}">{{ event.contact_phone }}</a>
+            </div>
+            {% endif %}
+            {% if event.emergency_contact %}
+            <div class="contact-item">
+                <span>🚨</span>
+                <span>Emergency: {{ event.emergency_contact }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- Social Links -->
+        {% if event.facebook_url or event.instagram_url or event.twitter_url or event.website_url %}
+        <div class="content-section">
+            <h3 class="section-title">
+                <span class="section-icon">🔗</span>
+                Links
+            </h3>
+            <div class="social-links">
+                {% if event.website_url %}
+                <a href="{{ event.website_url }}" target="_blank" class="social-link" title="Website">
+                    🌐
+                </a>
+                {% endif %}
+                {% if event.facebook_url %}
+                <a href="{{ event.facebook_url }}" target="_blank" class="social-link" title="Facebook">
+                    📘
+                </a>
+                {% endif %}
+                {% if event.instagram_url %}
+                <a href="{{ event.instagram_url }}" target="_blank" class="social-link" title="Instagram">
+                    📷
+                </a>
+                {% endif %}
+                {% if event.twitter_url %}
+                <a href="{{ event.twitter_url }}" target="_blank" class="social-link" title="Twitter">
+                    🐦
+                </a>
+                {% endif %}
+                {% if event.youtube_url %}
+                <a href="{{ event.youtube_url }}" target="_blank" class="social-link" title="YouTube">
+                    📺
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Admin Actions -->
         {% if request.state.user and request.state.user.is_admin %}
-            <a class="cta" style="background:#38a169; margin-left:0.7rem;" href="/admin/events/new">Create Another Event</a>
-        {% elif request.state.user %}
-            <a class="cta" style="background:#3182ce; margin-left:0.7rem;" href="/event/{{ event.id }}/book">Book this Event</a>
+        <div class="content-section">
+            <h3 class="section-title">
+                <span class="section-icon">⚙️</span>
+                Admin Actions
+            </h3>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <a href="/admin/events/{{ event.id }}/edit" class="booking-btn" style="background: #ffc107; color: #000;">
+                    Edit Event
+                </a>
+                <a href="/admin/events/{{ event.id }}/bookings" class="booking-btn" style="background: #6f42c1; color: white;">
+                    View Bookings
+                </a>
+            </div>
+        </div>
         {% endif %}
     </div>
+</div>
 {% endblock %} 

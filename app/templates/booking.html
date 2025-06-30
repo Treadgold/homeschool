@@ -176,6 +176,32 @@
     background: #e8f4fd;
 }
 
+.child-option.already-booked {
+    background: #e8f5e8;
+    border-color: #4caf50;
+    cursor: default;
+    opacity: 0.8;
+    position: relative;
+}
+
+.child-option.already-booked:hover {
+    background: #e8f5e8;
+    transform: none;
+}
+
+.booking-status {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: #4caf50;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    z-index: 1;
+}
+
 .child-option input[type="checkbox"] {
     display: none;
 }
@@ -197,6 +223,64 @@
     justify-content: center;
     font-size: 1.5rem;
     font-weight: bold;
+}
+
+.adult-selection {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.adult-option {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: white;
+}
+
+.adult-option:hover {
+    border-color: #28a745;
+    background: #f8f9fa;
+}
+
+.adult-option.selected {
+    border-color: #28a745;
+    background: #e8f5e8;
+}
+
+.adult-option input[type="checkbox"] {
+    display: none;
+}
+
+.adult-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.adult-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #28a745;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.adult-details {
+    flex: 1;
+}
+
+.adult-role-selection {
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
 .child-details h4 {
@@ -481,7 +565,7 @@
         <div class="step-connector active"></div>
         <div class="step active" id="step-1">
             <div class="step-number">1</div>
-            <div class="step-label">Select Children</div>
+            <div class="step-label">Select Participants</div>
         </div>
         <div class="step" id="step-2">
             <div class="step-number">2</div>
@@ -491,54 +575,143 @@
 
     <!-- Step Content -->
     <div class="booking-step">
-        <!-- Step 1: Select Children -->
+        <!-- Step 1: Select Participants -->
         <div class="step-content active" id="step-content-1">
-            <h3 style="margin: 0 0 1.5rem 0; color: #2b6cb0;">Select Children to Book</h3>
+            <h3 style="margin: 0 0 1.5rem 0; color: #2b6cb0;">Select Participants</h3>
             
             <form method="post" id="booking-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 
-                <!-- Existing Children -->
-                {% if children %}
-                <div class="child-selection">
-                    {% for child in children %}
-                    <div class="child-option" onclick="toggleChildSelection(this, {{ child.id }})">
-                        <input type="checkbox" name="child_ids" value="{{ child.id }}" id="child-{{ child.id }}">
-                        <div class="child-info">
-                            <div class="child-avatar">{{ child.name[0]|upper }}</div>
-                            <div class="child-details">
-                                <h4>{{ child.name }} (Age: {{ child.age }})</h4>
-                                <p>
-                                    {% if child.allergies %}Allergies: {{ child.allergies }} • {% endif %}
-                                    {% if child.needs_assisting_adult %}Needs adult assistance{% endif %}
-                                </p>
-                                {% if child.notes %}<p style="font-style: italic; color: #6c757d;">{{ child.notes }}</p>{% endif %}
+                <!-- Children Section -->
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="margin: 0 0 1rem 0; color: #495057; display: flex; align-items: center; gap: 0.5rem;">
+                        👶 Children
+                        {% if children %}<span style="background: #e3f2fd; color: #1976d2; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem;">{{ children|length }}</span>{% endif %}
+                    </h4>
+                    
+                    {% if children %}
+                    <div class="child-selection">
+                        {% for child in children %}
+                                                <div class="child-option{% if child.id in booked_child_ids %} already-booked{% endif %}" 
+                             onclick="handleChildSelection(this, {{ child.id }})"
+                             data-already-booked="{% if child.id in booked_child_ids %}true{% else %}false{% endif %}"
+                             data-child-name="{{ child.name }}">
+                             {% if child.id in booked_child_ids %}
+                             <div class="booking-status">✅ Already Booked</div>
+                             {% else %}
+                             <input type="checkbox" name="child_ids" value="{{ child.id }}" id="child-{{ child.id }}">
+                             {% endif %}
+                            <div class="child-info">
+                                <div class="child-avatar">{{ child.name[0]|upper }}</div>
+                                <div class="child-details">
+                                    <h4>{{ child.name }} (Age: {{ child.age }})</h4>
+                                    <p>
+                                        {% if child.allergies %}Allergies: {{ child.allergies }} • {% endif %}
+                                        {% if child.needs_assisting_adult %}Needs adult assistance{% endif %}
+                                    </p>
+                                    {% if child.notes %}<p style="font-style: italic; color: #6c757d;">{{ child.notes }}</p>{% endif %}
+                                </div>
+                            </div>
+                            {% if event.recommended_age and child.age < event.recommended_age %}
+                            <div class="age-warning">
+                                ⚠️ Below recommended age ({{ event.recommended_age }}+). Adult assistance required.
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div style="text-align: center; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 1rem;">
+                        <p style="margin: 0; color: #6c757d;">No saved children found. Add your children below or <a href="/family" style="color: #2b6cb0;">manage them here</a>.</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Add New Children -->
+                    <div class="add-child-section">
+                        <h4 style="margin: 0 0 1rem 0; color: #495057;">Add New Children</h4>
+                        <p style="margin: 0 0 1rem 0; color: #6c757d;">New children will be saved to your profile for future bookings.</p>
+                        <button type="button" class="add-child-btn" onclick="addChildForm()">
+                            <span>👶</span> Add Child
+                        </button>
+                    </div>
+                    
+                    <div id="new-children"></div>
+                </div>
+
+                <!-- Adults Section -->
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="margin: 0 0 1rem 0; color: #495057; display: flex; align-items: center; gap: 0.5rem;">
+                        👥 Adults
+                        {% if adults %}<span style="background: #e8f5e8; color: #2e7d32; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem;">{{ adults|length }}</span>{% endif %}
+                    </h4>
+                    
+                    {% if adults %}
+                    <div class="adult-selection">
+                        {% for adult in adults %}
+                        <div class="adult-option" onclick="toggleAdultSelection(this, {{ adult.id }})">
+                            <input type="checkbox" name="adult_ids" value="{{ adult.id }}" id="adult-{{ adult.id }}">
+                            <div class="adult-info">
+                                <div class="adult-avatar">{{ adult.name[0]|upper }}</div>
+                                <div class="adult-details">
+                                    <h4>{{ adult.name }}</h4>
+                                    <p>
+                                        {% if adult.relationship_to_family %}{{ adult.relationship_to_family|capitalize }}{% endif %}
+                                        {% if adult.phone %} • {{ adult.phone }}{% endif %}
+                                    </p>
+                                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                                        {% if adult.can_supervise_children %}
+                                        <span style="background: #d4edda; color: #155724; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">
+                                            👁 Can Supervise
+                                        </span>
+                                        {% endif %}
+                                        {% if adult.willing_to_volunteer %}
+                                        <span style="background: #cce5ff; color: #004085; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">
+                                            🙋 Volunteer
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    {% if adult.allergies %}<p style="margin: 0.5rem 0 0 0; color: #dc3545; font-size: 0.85rem;">⚠️ Allergies: {{ adult.allergies }}</p>{% endif %}
+                                </div>
+                                <div class="adult-role-selection" style="margin-left: auto;">
+                                    <select name="adult_role_{{ adult.id }}" style="padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9rem;" onchange="updateSupervisionOptions()">
+                                        <option value="attendee">Attendee</option>
+                                        {% if adult.willing_to_volunteer %}
+                                        <option value="volunteer">Volunteer</option>
+                                        {% endif %}
+                                        {% if adult.can_supervise_children %}
+                                        <option value="supervisor">Supervisor</option>
+                                        {% endif %}
+                                    </select>
+                                </div>
                             </div>
                         </div>
-                        {% if event.recommended_age and child.age < event.recommended_age %}
-                        <div class="age-warning">
-                            ⚠️ Below recommended age ({{ event.recommended_age }}+). Adult assistance required.
-                        </div>
-                        {% endif %}
+                        {% endfor %}
                     </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div style="text-align: center; padding: 2rem; color: #6c757d;">
-                    <p>No saved children found. Add your children below or <a href="/children" style="color: #2b6cb0;">manage them here</a>.</p>
-                </div>
-                {% endif %}
+                    {% else %}
+                    <div style="text-align: center; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 1rem;">
+                        <p style="margin: 0; color: #6c757d;">You don't have any adults registered yet.</p>
+                        <a href="/family" style="color: #2b6cb0; text-decoration: none; font-weight: 500;">Add adults to your family →</a>
+                    </div>
+                    {% endif %}
 
-                <!-- Add New Children -->
-                <div class="add-child-section">
-                    <h4 style="margin: 0 0 1rem 0; color: #495057;">Add New Children</h4>
-                    <p style="margin: 0 0 1rem 0; color: #6c757d;">New children will be saved to your profile for future bookings.</p>
-                    <button type="button" class="add-child-btn" onclick="addChildForm()">
-                        <span>👶</span> Add Child
-                    </button>
+                    <!-- Add New Adults -->
+                    <div class="add-adult-section">
+                        <h4 style="margin: 0 0 1rem 0; color: #495057;">Add New Adults</h4>
+                        <p style="margin: 0 0 1rem 0; color: #6c757d;">New adults will be saved to your profile for future bookings.</p>
+                        <button type="button" class="add-adult-btn" onclick="addAdultForm()">
+                            <span>👥</span> Add Adult
+                        </button>
+                    </div>
+                    
+                    <div id="new-adults"></div>
                 </div>
-                
-                <div id="new-children"></div>
+
+                <!-- Supervision Assignment -->
+                <div id="supervision-section" style="display: none; margin-bottom: 2rem; padding: 1.5rem; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px;">
+                    <h4 style="margin: 0 0 1rem 0; color: #856404;">👨‍👩‍👧‍👦 Supervision Assignment</h4>
+                    <p style="margin: 0 0 1rem 0; color: #856404; font-size: 0.9rem;">Some children need assisting adults. Please assign supervisors:</p>
+                    <div id="supervision-assignments"></div>
+                </div>
 
                 <div class="step-actions">
                     <a href="/event/{{ event.id }}" class="btn-secondary">← Back to Event</a>
@@ -570,6 +743,14 @@
                     <span class="summary-label">Children:</span>
                     <span class="summary-value" id="selected-children-count">0 selected</span>
                 </div>
+                <div class="summary-item">
+                    <span class="summary-label">Adults:</span>
+                    <span class="summary-value" id="selected-adults-count">0 selected</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Total Participants:</span>
+                    <span class="summary-value" id="total-participants-count">0</span>
+                </div>
                 {% if event.cost %}
                 <div class="summary-item total-cost">
                     <span class="summary-label">Total Cost:</span>
@@ -588,6 +769,7 @@
 
 <script>
 let childFormCount = 0;
+let adultFormCount = 0;
 let currentStep = 1;
 {% if event.cost %}
 let eventCost = {{ event.cost }};
@@ -606,6 +788,21 @@ function toggleChildSelection(element, childId) {
     }
     
     updateSummary();
+    updateSupervisionOptions();
+}
+
+function toggleAdultSelection(element, adultId) {
+    const checkbox = document.getElementById('adult-' + adultId);
+    checkbox.checked = !checkbox.checked;
+    
+    if (checkbox.checked) {
+        element.classList.add('selected');
+    } else {
+        element.classList.remove('selected');
+    }
+    
+    updateSummary();
+    updateSupervisionOptions();
 }
 
 function addChildForm() {
@@ -635,18 +832,190 @@ function addChildForm() {
                 <input type="text" name="new_child_notes" placeholder="Any special requirements">
             </div>
         </div>
-        <button type="button" class="remove-child-btn" onclick="this.parentElement.remove()">Remove Child</button>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" name="new_child_needs_adult" style="margin-right: 0.5rem;">
+                Needs Assisting Adult
+            </label>
+        </div>
+        <button type="button" class="remove-child-btn" onclick="this.parentElement.remove(); updateSupervisionOptions();">Remove Child</button>
     `;
     container.appendChild(div);
+}
+
+function addAdultForm() {
+    const container = document.getElementById('new-adults');
+    const idx = adultFormCount++;
+    const div = document.createElement('div');
+    div.className = 'adult-form';
+    div.innerHTML = `
+        <h4 style="margin: 0 0 1rem 0; color: #495057;">New Adult ${idx + 1}</h4>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Name *</label>
+                <input type="text" name="new_adult_names" required>
+            </div>
+            <div class="form-group">
+                <label>Relationship</label>
+                <select name="new_adult_relationships">
+                    <option value="">Select relationship</option>
+                    <option value="parent">Parent</option>
+                    <option value="guardian">Guardian</option>
+                    <option value="caregiver">Caregiver</option>
+                    <option value="volunteer">Volunteer</option>
+                    <option value="relative">Relative</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Phone</label>
+                <input type="tel" name="new_adult_phones" placeholder="Contact phone">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="new_adult_emails" placeholder="Contact email">
+            </div>
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Allergies (if any)</label>
+                <input type="text" name="new_adult_allergies" placeholder="e.g., nuts, dairy">
+            </div>
+            <div class="form-group">
+                <label>Role for this event</label>
+                <select name="new_adult_roles">
+                    <option value="attendee">Attendee</option>
+                    <option value="volunteer">Volunteer</option>
+                    <option value="supervisor">Supervisor</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="new_adult_can_supervise" style="margin-right: 0.5rem;">
+                    Can Supervise Children
+                </label>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="new_adult_volunteer" style="margin-right: 0.5rem;">
+                    Willing to Volunteer
+                </label>
+            </div>
+        </div>
+        <button type="button" class="remove-adult-btn" onclick="this.parentElement.remove(); updateSupervisionOptions();">Remove Adult</button>
+    `;
+    container.appendChild(div);
+}
+
+function updateSupervisionOptions() {
+    // Check if any children need assistance
+    const needsAssistanceChildren = [];
+    
+    // Check existing children
+    document.querySelectorAll('input[name="child_ids"]:checked').forEach(checkbox => {
+        const childId = checkbox.value;
+        // This would need to be passed from the template or detected based on data attributes
+        const childElement = checkbox.closest('.child-option');
+        if (childElement && childElement.textContent.includes('Needs adult assistance')) {
+            needsAssistanceChildren.push({id: childId, name: childElement.querySelector('h4').textContent});
+        }
+    });
+    
+    // Check new children
+    document.querySelectorAll('input[name="new_child_needs_adult"]:checked').forEach((checkbox, index) => {
+        const nameInput = document.querySelectorAll('input[name="new_child_names"]')[index];
+        if (nameInput && nameInput.value) {
+            needsAssistanceChildren.push({id: 'new_' + index, name: nameInput.value});
+        }
+    });
+    
+    const supervisionSection = document.getElementById('supervision-section');
+    const assignmentsDiv = document.getElementById('supervision-assignments');
+    
+    if (needsAssistanceChildren.length > 0) {
+        supervisionSection.style.display = 'block';
+        
+        // Get available supervisors
+        const supervisors = [];
+        
+        // Check existing adults marked as supervisors
+        document.querySelectorAll('input[name="adult_ids"]:checked').forEach(checkbox => {
+            const adultId = checkbox.value;
+            const roleSelect = document.querySelector(`select[name="adult_role_${adultId}"]`);
+            if (roleSelect && roleSelect.value === 'supervisor') {
+                const adultElement = checkbox.closest('.adult-option');
+                const adultName = adultElement.querySelector('h4').textContent;
+                supervisors.push({id: adultId, name: adultName, type: 'existing'});
+            }
+        });
+        
+        // Check new adults marked as supervisors
+        document.querySelectorAll('select[name="new_adult_roles"]').forEach((select, index) => {
+            if (select.value === 'supervisor') {
+                const nameInput = document.querySelectorAll('input[name="new_adult_names"]')[index];
+                if (nameInput && nameInput.value) {
+                    supervisors.push({id: 'new_' + index, name: nameInput.value, type: 'new'});
+                }
+            }
+        });
+        
+        // Generate assignment options
+        let html = '';
+        needsAssistanceChildren.forEach(child => {
+            html += `
+                <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 6px; border: 1px solid #dee2e6;">
+                    <strong>${child.name}</strong> needs supervision by:
+                    <select name="supervision_${child.id}" style="margin-left: 0.5rem; padding: 0.3rem;">
+                        <option value="">Select supervisor...</option>
+                        ${supervisors.map(supervisor => 
+                            `<option value="${supervisor.type}_${supervisor.id}">${supervisor.name}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `;
+        });
+        
+        if (supervisors.length === 0) {
+            html += '<p style="color: #dc3545; margin: 0;">⚠️ No supervisors available. Please select adults with supervisor role.</p>';
+        }
+        
+        assignmentsDiv.innerHTML = html;
+    } else {
+        supervisionSection.style.display = 'none';
+    }
 }
 
 function nextStep() {
     const selectedChildren = document.querySelectorAll('input[name="child_ids"]:checked').length;
     const newChildren = document.querySelectorAll('input[name="new_child_names"]').length;
+    const selectedAdults = document.querySelectorAll('input[name="adult_ids"]:checked').length;
+    const newAdults = document.querySelectorAll('input[name="new_adult_names"]').length;
     
-    if (selectedChildren === 0 && newChildren === 0) {
-        alert('Please select at least one child or add a new child to continue.');
+    if (selectedChildren === 0 && newChildren === 0 && selectedAdults === 0 && newAdults === 0) {
+        alert('Please select at least one participant (child or adult) to continue.');
         return;
+    }
+    
+    // Check supervision requirements
+    const needsAssistanceChildren = document.querySelectorAll('input[name="new_child_needs_adult"]:checked').length;
+    const supervisionSelects = document.querySelectorAll('select[name^="supervision_"]');
+    
+    if (needsAssistanceChildren > 0 || supervisionSelects.length > 0) {
+        let allAssigned = true;
+        supervisionSelects.forEach(select => {
+            if (!select.value) {
+                allAssigned = false;
+            }
+        });
+        
+        if (!allAssigned) {
+            alert('Please assign supervisors to all children who need assistance.');
+            return;
+        }
     }
     
     currentStep = 2;
@@ -692,10 +1061,19 @@ function updateSummary() {
     const newChildren = document.querySelectorAll('input[name="new_child_names"]').length;
     const totalChildren = selectedChildren + newChildren;
     
+    const selectedAdults = document.querySelectorAll('input[name="adult_ids"]:checked').length;
+    const newAdults = document.querySelectorAll('input[name="new_adult_names"]').length;
+    const totalAdults = selectedAdults + newAdults;
+    
+    const totalParticipants = totalChildren + totalAdults;
+    
     document.getElementById('selected-children-count').textContent = totalChildren + ' child' + (totalChildren !== 1 ? 'ren' : '');
+    document.getElementById('selected-adults-count').textContent = totalAdults + ' adult' + (totalAdults !== 1 ? 's' : '');
+    document.getElementById('total-participants-count').textContent = totalParticipants;
     
     if (eventCost > 0) {
-        const totalCost = totalChildren * eventCost;
+        // For now, assume same cost for children and adults - can be customized later
+        const totalCost = totalParticipants * eventCost;
         document.getElementById('total-cost').textContent = '$' + totalCost.toFixed(2);
     }
 }

@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Check Readme.md and /docs folder to ensure we follow convensions in the project

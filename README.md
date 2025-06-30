@@ -199,7 +199,8 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 ### **💻 Local AI Models (Free Forever)**
 
-#### **Ollama (No Internet Required)**
+#### **Ollama (No Internet Required after installation)**
+* GPU required for best performance
 ```bash
 # Best for: Privacy, zero ongoing costs
 # Cost: Free (just hardware)

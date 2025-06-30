@@ -405,32 +405,39 @@
     <!-- Bookings Section -->
     <div class="bookings-section">
         <div class="bookings-header">
-            <h2 class="bookings-title">👥 Participants ({{ event.bookings|length }})</h2>
-            <span class="booking-count">{{ event.bookings|length }} children registered</span>
+            <h2 class="bookings-title">👥 Participants ({{ (event.bookings|length + event.adult_bookings|length) }})</h2>
+            <span class="booking-count">{{ event.bookings|length }} children, {{ event.adult_bookings|length }} adults registered</span>
         </div>
 
+        {% if event.bookings or event.adult_bookings %}
+        
+        <!-- Children Section -->
         {% if event.bookings %}
-        <div class="bookings-grid">
-            {% for booking in event.bookings %}
-            <div class="booking-card">
-                <div class="booking-header">
-                    <div class="child-info">
-                        <div class="child-avatar">{{ booking.child.name[0]|upper }}</div>
-                        <div class="child-details">
-                            <h3>{{ booking.child.name }}</h3>
-                            <p>Age: {{ booking.child.age }} • {{ booking.child.user.email }}</p>
-                            <p class="booking-date">Booked: {{ booking.timestamp.strftime('%B %d, %Y at %I:%M %p') }}</p>
+        <div style="margin-bottom: 2rem;">
+            <h3 style="color: #2b6cb0; margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #e9ecef; display: flex; align-items: center; gap: 0.5rem;">
+                👶 Children <span style="background: #e3f2fd; color: #1976d2; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem;">{{ event.bookings|length }}</span>
+            </h3>
+            <div class="bookings-grid">
+                {% for booking in event.bookings %}
+                <div class="booking-card">
+                    <div class="booking-header">
+                        <div class="child-info">
+                            <div class="child-avatar">{{ booking.child.name[0]|upper }}</div>
+                            <div class="child-details">
+                                <h3>{{ booking.child.name }}</h3>
+                                <p>Age: {{ booking.child.age }} • {{ booking.child.user.email }}</p>
+                                <p class="booking-date">Booked: {{ booking.timestamp.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                            </div>
+                        </div>
+                        <div class="parent-info">
+                            <a href="mailto:{{ booking.child.user.email }}" class="parent-email">
+                                📧 Contact Parent
+                            </a>
+                            <div class="booking-date">
+                                Parent: {{ booking.child.user.email }}
+                            </div>
                         </div>
                     </div>
-                    <div class="parent-info">
-                        <a href="mailto:{{ booking.child.user.email }}" class="parent-email">
-                            📧 Contact Parent
-                        </a>
-                        <div class="booking-date">
-                            Parent: {{ booking.child.user.email }}
-                        </div>
-                    </div>
-                </div>
                 
                 <div class="booking-meta">
                     {% if booking.child.allergies %}
@@ -465,6 +472,82 @@
             </div>
             {% endfor %}
         </div>
+        </div>
+        {% endif %}
+        
+        <!-- Adults Section -->
+        {% if event.adult_bookings %}
+        <div style="margin-bottom: 2rem;">
+            <h3 style="color: #28a745; margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #e9ecef; display: flex; align-items: center; gap: 0.5rem;">
+                👥 Adults <span style="background: #e8f5e8; color: #2e7d32; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem;">{{ event.adult_bookings|length }}</span>
+            </h3>
+            <div class="bookings-grid">
+                {% for booking in event.adult_bookings %}
+                <div class="booking-card" style="border-left: 4px solid #28a745;">
+                    <div class="booking-header">
+                        <div class="child-info">
+                            <div class="child-avatar" style="background: #28a745;">{{ booking.adult.name[0]|upper }}</div>
+                            <div class="child-details">
+                                <h3>{{ booking.adult.name }}</h3>
+                                <p>{{ booking.adult.relationship_to_family|capitalize if booking.adult.relationship_to_family else 'Adult' }} • {{ booking.adult.user.email }}</p>
+                                <p class="booking-date">Booked: {{ booking.timestamp.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                                {% if booking.role %}
+                                <p style="margin: 0.5rem 0; padding: 0.3rem 0.6rem; background: #e8f5e8; border-radius: 4px; font-size: 0.85rem; color: #2e7d32;">
+                                    Role: {{ booking.role|capitalize }}
+                                </p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="parent-info">
+                            <a href="mailto:{{ booking.adult.user.email }}" class="parent-email">
+                                📧 Contact Adult
+                            </a>
+                            {% if booking.adult.phone %}
+                            <div class="booking-date">
+                                Phone: {{ booking.adult.phone }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="booking-meta">
+                        {% if booking.adult.allergies %}
+                        <span class="meta-tag warning">⚠️ Allergies: {{ booking.adult.allergies }}</span>
+                        {% endif %}
+                        {% if booking.adult.can_supervise_children %}
+                        <span class="meta-tag success">👁 Can Supervise Children</span>
+                        {% endif %}
+                        {% if booking.adult.willing_to_volunteer %}
+                        <span class="meta-tag info">🙋 Willing to Volunteer</span>
+                        {% endif %}
+                        {% if booking.adult.medical_conditions %}
+                        <span class="meta-tag warning">🏥 Medical: {{ booking.adult.medical_conditions }}</span>
+                        {% endif %}
+                        {% if booking.role == 'volunteer' %}
+                        <span class="meta-tag success">🤝 Volunteer Role</span>
+                        {% elif booking.role == 'supervisor' %}
+                        <span class="meta-tag info">👁 Supervisor Role</span>
+                        {% endif %}
+                        {% if booking.payment_status == 'paid' %}
+                        <span class="meta-tag success">✅ Paid</span>
+                        {% elif booking.payment_status == 'unpaid' %}
+                        <span class="meta-tag danger">❌ Unpaid</span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="booking-actions">
+                        <a href="mailto:{{ booking.adult.user.email }}?subject=Regarding {{ event.title }}&body=Hi {{ booking.adult.name }},%0D%0A%0D%0AI'm contacting you regarding your booking for {{ event.title }}.%0D%0A%0D%0AEvent Details:%0D%0A- Date: {{ event.date.strftime('%B %d, %Y at %I:%M %p') }}%0D%0A- Location: {{ event.location or 'TBD' }}%0D%0A{% if booking.role %}- Your Role: {{ booking.role|capitalize }}%0D%0A{% endif %}%0D%0APlease let me know if you have any questions.%0D%0A%0D%0ABest regards," class="btn btn-primary">📧 Send Email</a>
+                        <form method="POST" action="/admin/adult-bookings/{{ booking.id }}/cancel" style="display: inline;" onsubmit="return confirm('Are you sure you want to cancel this adult booking? This action cannot be undone.')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn btn-danger">❌ Cancel Booking</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
         {% else %}
         <div class="no-bookings">
             <h3>No bookings yet</h3>
