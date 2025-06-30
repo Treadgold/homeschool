@@ -457,13 +457,16 @@ What event would you like to create?"""
             
             db.commit()
             
+            # Return the response with tracking info
             return {
                 "ai_response": ai_response.get('response', 'I apologize, but I encountered an error processing your message.'),
                 "extracted_info": ai_response.get('extracted_info'),
-                "event_preview": ai_response.get('extracted_info'),
+                "event_preview": ai_response.get('extracted_info') is not None,
+                "tool_calls_made": bool(ai_response.get('tool_calls')),
+                "event_data_extracted": bool(ai_response.get('extracted_info')),
                 "provider": ai_provider.__class__.__name__,
                 "model": getattr(ai_provider, 'model_name', 'unknown'),
-                "agent_status": "waiting"
+                "agent_status": "completed"
             }
             
         except Exception as e:
@@ -472,6 +475,8 @@ What event would you like to create?"""
                 "ai_response": f"❌ Sorry, I encountered an error: {str(e)}",
                 "extracted_info": None,
                 "event_preview": None,
+                "tool_calls_made": False,
+                "event_data_extracted": False,
                 "provider": "error",
                 "model": "error",
                 "agent_status": "error"

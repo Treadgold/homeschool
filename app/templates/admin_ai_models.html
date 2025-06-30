@@ -550,7 +550,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadEndpointInfo() {
     try {
-        const response = await fetch('/api/ai/models/available', {
+                        const response = await fetch('/api/ai/models/available', {
             credentials: 'same-origin'
         });
         const data = await response.json();

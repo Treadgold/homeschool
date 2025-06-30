@@ -817,13 +817,21 @@ async def promote_user(request: Request, db: Session = Depends(get_db), user_id:
     return RedirectResponse(url="/admin/users", status_code=HTTP_303_SEE_OTHER)
 
 @app.on_event("startup")
-def startup_tasks():
+async def startup_tasks():
     print("🚀 Starting LifeLearners application...")
+    print("=" * 60)
+    
+    # Database status
+    print("\n📊 DATABASE CONFIGURATION")
+    print("-" * 30)
+    print(f"🔍 Database URL: {config.DATABASE_URL[:50]}...")
     
     # Check Facebook OAuth configuration with debug info
-    print(f"🔍 Debug - Facebook Client ID: {config.FACEBOOK_CLIENT_ID[:10]}..." if config.FACEBOOK_CLIENT_ID else "🔍 Debug - Facebook Client ID: NOT SET")
-    print(f"🔍 Debug - Facebook Secret: {'SET' if config.FACEBOOK_CLIENT_SECRET else 'NOT SET'}")
-    print(f"🔍 Debug - Facebook OAuth Enabled: {config.facebook_oauth_enabled}")
+    print("\n🔐 OAUTH CONFIGURATION")
+    print("-" * 30)
+    print(f"🔍 Facebook Client ID: {config.FACEBOOK_CLIENT_ID[:10]}..." if config.FACEBOOK_CLIENT_ID else "🔍 Facebook Client ID: NOT SET")
+    print(f"🔍 Facebook Secret: {'SET' if config.FACEBOOK_CLIENT_SECRET else 'NOT SET'}")
+    print(f"🔍 Facebook OAuth Enabled: {config.facebook_oauth_enabled}")
     
     if config.facebook_oauth_enabled:
         print("✅ Facebook OAuth is configured")
@@ -831,16 +839,91 @@ def startup_tasks():
         print("⚠️  Facebook OAuth is not configured (missing FACEBOOK_CLIENT_ID or FACEBOOK_CLIENT_SECRET)")
     
     # Check Google OAuth configuration with debug info
-    print(f"🔍 Debug - Google Client ID: {config.GOOGLE_CLIENT_ID[:10]}..." if config.GOOGLE_CLIENT_ID else "🔍 Debug - Google Client ID: NOT SET")
-    print(f"🔍 Debug - Google Secret: {'SET' if config.GOOGLE_CLIENT_SECRET else 'NOT SET'}")
-    print(f"🔍 Debug - Google OAuth Enabled: {config.google_oauth_enabled}")
+    print(f"🔍 Google Client ID: {config.GOOGLE_CLIENT_ID[:10]}..." if config.GOOGLE_CLIENT_ID else "🔍 Google Client ID: NOT SET")
+    print(f"🔍 Google Secret: {'SET' if config.GOOGLE_CLIENT_SECRET else 'NOT SET'}")
+    print(f"🔍 Google OAuth Enabled: {config.google_oauth_enabled}")
     
     if config.google_oauth_enabled:
         print("✅ Google OAuth is configured")
     else:
         print("⚠️  Google OAuth is not configured (missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET)")
     
+    # AI System Configuration
+    print("\n🤖 AI SYSTEM CONFIGURATION")
+    print("-" * 30)
+    ollama_endpoint = os.getenv("OLLAMA_ENDPOINT", "http://host.docker.internal:11434")
+    current_model = os.getenv("CURRENT_AI_MODEL", "mock_assistant")
+    
+    print(f"🔍 Ollama Endpoint: {ollama_endpoint}")
+    print(f"🔍 Current AI Model: {current_model}")
+    print(f"🔍 OpenAI API Key: {'SET' if os.getenv('OPENAI_API_KEY') else 'NOT SET'}")
+    print(f"🔍 Anthropic API Key: {'SET' if os.getenv('ANTHROPIC_API_KEY') else 'NOT SET'}")
+    
+    # Test AI system connectivity
+    print("\n🔬 AI SYSTEM CONNECTIVITY TEST")
+    print("-" * 30)
+    try:
+        from app.ai_providers import ai_manager
+        
+        # Get available models
+        available_models = ai_manager.get_available_models()
+        print(f"📋 Available AI models: {len(available_models)}")
+        for model_key, model_config in available_models.items():
+            status = "✅ ENABLED" if model_config.enabled else "❌ DISABLED"
+            print(f"   - {model_key} ({model_config.provider}): {status}")
+        
+        # Test current provider
+        print(f"\n🧪 Testing current provider: {current_model}")
+        try:
+            current_provider = ai_manager.get_current_provider()
+            print(f"✅ Current provider initialized: {current_provider.__class__.__name__}")
+            
+            # For Ollama, test connectivity (quick check only during startup)
+            if hasattr(current_provider, 'base_url') and 'ollama' in current_provider.base_url:
+                print(f"🔗 Testing Ollama connectivity to {current_provider.base_url}...")
+                
+                # Quick connectivity test with short timeout
+                import httpx
+                try:
+                    async with httpx.AsyncClient(timeout=5) as client:
+                        response = await client.get(f"{current_provider.base_url}/api/tags")
+                        if response.status_code == 200:
+                            models_data = response.json()
+                            model_count = len(models_data.get("models", []))
+                            print(f"✅ Ollama connection successful - {model_count} models available")
+                            if current_provider.model in [m["name"] for m in models_data.get("models", [])]:
+                                print(f"✅ Target model '{current_provider.model}' is available")
+                            else:
+                                print(f"⚠️  Target model '{current_provider.model}' not found in available models")
+                        else:
+                            print(f"⚠️  Ollama responded with status {response.status_code}")
+                except httpx.ConnectError:
+                    print(f"⚠️  Cannot connect to Ollama at {current_provider.base_url}")
+                    print("💡 This is normal if Ollama is on the host system and containers are starting")
+                    print("💡 AI features will attempt to connect when first used")
+                except Exception as e:
+                    print(f"⚠️  Ollama connectivity test error: {e}")
+            
+        except Exception as provider_error:
+            print(f"⚠️  Could not initialize current provider: {provider_error}")
+            print("💡 AI system will fall back to available providers when needed")
+            
+    except Exception as ai_error:
+        print(f"⚠️  AI system initialization error: {ai_error}")
+        print("💡 AI features may not be available until this is resolved")
+    
+    # Payment system status
+    print("\n💳 PAYMENT SYSTEM CONFIGURATION")
+    print("-" * 30)
+    print(f"🔍 Payments Enabled: {config.ENABLE_PAYMENTS}")
+    print(f"🔍 Stripe Publishable Key: {'SET' if config.STRIPE_PUBLISHABLE_KEY else 'NOT SET'}")
+    print(f"🔍 Stripe Secret Key: {'SET' if config.STRIPE_SECRET_KEY else 'NOT SET'}")
+    print(f"🔍 Stripe Test Mode: {config.stripe_is_test_mode}")
+    
     create_test_users()
+    
+    print("\n🎉 LifeLearners startup complete!")
+    print("=" * 60)
 
 def create_test_users():
     from app.models import User
@@ -1911,4 +1994,89 @@ async def admin_event_bookings(request: Request, event_id: int, user: User = Dep
 from app.ai.router import ai_router
 
 # Include the AI router with all endpoints
-app.include_router(ai_router)
+app.include_router(ai_router, prefix="/api/ai")
+
+# Add the main AI create event page route at root level
+@app.get("/ai-create-event", response_class=HTMLResponse)
+async def ai_create_event_main_page(
+    request: Request,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Main AI event creation page accessible at /ai-create-event"""
+    return templates.TemplateResponse("ai_create_event.html", {
+        "request": request,
+        "current_user": user,
+        "csrf_token": generate_csrf_token()
+    })
+
+# ===== AI ADMIN ENDPOINTS =====
+# These are at root level to be consistent with other admin routes
+
+@app.get("/admin/ai-models", response_class=HTMLResponse)
+async def admin_ai_models(request: Request, user: User = Depends(require_admin)):
+    """Show AI model configuration page"""
+    from app.ai.services import ModelService
+    model_service = ModelService()
+    return model_service.get_available_models(request, user)
+
+@app.post("/admin/ai-models/set-current")
+async def set_current_ai_model(
+    request: Request,
+    model_key: str = Form(...),
+    csrf_token: str = Form(...),
+    user: User = Depends(require_admin)
+):
+    """Set the current AI model"""
+    try:
+        from app.ai.services import ModelService
+        model_service = ModelService()
+        return await model_service.set_current_model(model_key, user, csrf_token)
+        
+    except Exception as e:
+        logging.error(f"Failed to set AI model: {e}")
+        return {
+            "success": False,
+            "message": f"Failed to set AI model: {str(e)}"
+        }
+
+@app.post("/admin/ai-models/{model_key}/test")
+async def test_ai_model(
+    model_key: str,
+    request: Request,
+    csrf_token: str = Form(...),
+    user: User = Depends(get_current_user)
+):
+    """Test an AI model with chat and function calling capabilities"""
+    try:
+        from app.ai.services import ModelService
+        model_service = ModelService()
+        return await model_service.test_model(model_key, user, csrf_token)
+        
+    except Exception as e:
+        logging.error(f"Failed to test AI model: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Model testing failed"
+        }
+
+@app.post("/admin/ai-models/refresh-ollama")
+async def refresh_ollama_models(
+    request: Request,
+    csrf_token: str = Form(...),
+    user: User = Depends(require_admin)
+):
+    """Refresh available Ollama models"""
+    try:
+        from app.ai.services import ModelService
+        model_service = ModelService()
+        return await model_service.refresh_ollama_models(user, csrf_token)
+    except Exception as e:
+        logging.error(f"Failed to refresh Ollama models: {e}")
+        return {
+            "success": False,
+            "message": f"Failed to refresh models: {str(e)}"
+        }
+
+

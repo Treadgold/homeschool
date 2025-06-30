@@ -330,7 +330,11 @@
             </div>
             
             <div class="panel-body">
-                <div id="event-preview">
+                <div id="event-preview"
+                     hx-get="/api/ai/event-preview"
+                     hx-trigger="load, messageProcessed from:body"
+                     hx-include="[name='session_id']"
+                     hx-swap="innerHTML">
                     <div class="empty-state">
                         <div style="font-size: 3rem; margin-bottom: 1rem;">📅</div>
                         <h4>No Event Data Yet</h4>

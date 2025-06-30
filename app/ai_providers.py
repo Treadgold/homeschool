@@ -295,6 +295,8 @@ class OllamaProvider(BaseAIProvider):
     
     async def _try_generate_endpoint(self, messages: List[Dict[str, str]], tools: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Fallback to /api/generate with prompt conversion and enhanced tool calling"""
+        import json  # Add json import for tool examples
+        
         # Convert messages to a single prompt for /api/generate
         prompt_parts = []
         for msg in messages:
@@ -328,24 +330,40 @@ class OllamaProvider(BaseAIProvider):
                 if param_desc:
                     tool_descriptions.append(f"  Parameters: {', '.join(param_desc)}")
                 
-                # Add example format
+                # Add specific examples for common tools
                 if name == "create_event_draft":
-                    tool_examples.append(f'TOOL_CALL: {name} {{"title": "Event Title", "description": "Event details", "location": "Event location", "date": "2024-12-01", "cost": 25}}')
+                    tool_examples.append(f'TOOL_CALL: {name} {{"title": "Birthday Party Fun", "description": "A fun birthday party for kids", "location": "Community Hall", "cost": 25, "max_pupils": 15}}')
+                else:
+                    # Generic example
+                    example_params = {}
+                    if parameters.get("properties"):
+                        for param_name, param_info in list(parameters["properties"].items())[:3]:  # First 3 params
+                            if param_info.get("type") == "string":
+                                example_params[param_name] = f"example_{param_name}"
+                            elif param_info.get("type") == "integer":
+                                example_params[param_name] = 42
+                            elif param_info.get("type") == "boolean":
+                                example_params[param_name] = True
+                    
+                    if example_params:
+                        tool_examples.append(f'TOOL_CALL: {name} {json.dumps(example_params)}')
             
-            enhanced_prompt = f"""
+            enhanced_system_prompt = f"""You are a helpful AI assistant with access to function calling tools.
+
+CRITICAL: When you have information to act on, USE the tools immediately. Do not just explain what you would do.
+
+For example, if a user provides event details like "party for twins at 100 south st at 10am august 12th":
+- IMMEDIATELY call: TOOL_CALL: create_event_draft {{"title": "Birthday Party for Twins", "date": "2024-08-12", "time": "10:00", "location": "100 South St"}}
+- Do NOT just say "I would use the create_event_draft tool" - actually use it!
+
+{original_system_prompt}
+
 Available tools:
-{chr(10).join(tool_descriptions)}
+{tool_examples}
 
-When you need to use a tool, respond with exactly this format:
-TOOL_CALL: tool_name {{"parameter": "value", "parameter2": "value2"}}
-
-Examples:
-{chr(10).join(tool_examples)}
-
-Important: You can use tools to help create, validate, or get suggestions for events. Use them when helpful!
-"""
+Remember: ACT, don't just describe!"""
             
-            prompt_parts.insert(-1, enhanced_prompt)
+            prompt_parts.insert(-1, enhanced_system_prompt)
         
         prompt = "\n\n".join(prompt_parts)
         if not prompt.endswith("Assistant:"):
@@ -436,34 +454,85 @@ Important: You can use tools to help create, validate, or get suggestions for ev
         logging.info(f"Available tool names: {tool_names}")
         logging.info(f"Content to parse: {content[:200]}...")
         
-        # Pattern to match TOOL_CALL: function_name {"param": "value"}
-        pattern = r'TOOL_CALL:\s*(\w+)\s*(\{[^}]*\})'
-        matches = re.findall(pattern, content)
+        # Enhanced patterns to match different function call formats
+        patterns = [
+            # Original TOOL_CALL: format
+            r'TOOL_CALL:\s*(\w+)\s*(\{[^}]*\})',
+            # Alternative formats that models might use
+            r'```(?:json)?\s*(\w+)\s*(\{[^}]*\})\s*```',
+            r'function:\s*(\w+)\s*(\{[^}]*\})',
+            r'call\s+(\w+)\s*(\{[^}]*\})',
+            # More flexible JSON-like patterns
+            r'(\w+)\s*\(\s*(\{[^}]*\})\s*\)',
+            # Direct tool name mentions with JSON
+            rf'({"|".join(re.escape(name) for name in tool_names if name)})\s*[:=]\s*(\{{[^}}]*\}})',
+        ]
         
-        logging.info(f"Found {len(matches)} potential tool calls")
-        
-        for function_name, args_str in matches:
-            logging.info(f"Checking function: '{function_name}' against available tools: {tool_names}")
+        for pattern in patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE | re.MULTILINE)
             
-            if function_name in tool_names:
-                try:
-                    # Parse the JSON arguments
-                    arguments = json.loads(args_str)
+            if matches:
+                logging.info(f"Found {len(matches)} matches with pattern: {pattern}")
+                
+                for function_name, args_str in matches:
+                    logging.info(f"Checking function: '{function_name}' against available tools: {tool_names}")
                     
-                    tool_calls.append({
-                        "function": {
-                            "name": function_name,
-                            "arguments": json.dumps(arguments)
-                        }
-                    })
-                    logging.info(f"Successfully parsed tool call: {function_name} with args: {arguments}")
+                    # Check if function name matches (case insensitive)
+                    matching_tool = None
+                    for tool_name in tool_names:
+                        if tool_name.lower() == function_name.lower():
+                            matching_tool = tool_name
+                            break
                     
-                except json.JSONDecodeError as e:
-                    logging.warning(f"Failed to parse tool call arguments: {args_str} - {e}")
-                    continue
-            else:
-                logging.warning(f"Unknown tool function: {function_name} (available: {tool_names})")
+                    if matching_tool:
+                        try:
+                            # Parse the JSON arguments
+                            arguments = json.loads(args_str)
+                            
+                            tool_calls.append({
+                                "function": {
+                                    "name": matching_tool,
+                                    "arguments": json.dumps(arguments)
+                                }
+                            })
+                            logging.info(f"Successfully parsed tool call: {matching_tool} with args: {arguments}")
+                            
+                        except json.JSONDecodeError as e:
+                            logging.warning(f"Failed to parse tool call arguments: {args_str} - {e}")
+                            continue
+                    else:
+                        logging.warning(f"Unknown tool function: {function_name} (available: {tool_names})")
+                
+                # If we found matches with this pattern, don't try other patterns
+                if tool_calls:
+                    break
         
+        # Additional fallback: look for tool names mentioned in text with likely parameters
+        if not tool_calls:
+            for tool_name in tool_names:
+                if tool_name.lower() in content.lower():
+                    logging.info(f"Tool '{tool_name}' mentioned in content, attempting parameter extraction")
+                    
+                    # Try to extract JSON-like structures near the tool name
+                    tool_context = re.search(rf'{re.escape(tool_name)}.*?(\{{[^}}]*\}})', content, re.IGNORECASE | re.DOTALL)
+                    if tool_context:
+                        try:
+                            args_str = tool_context.group(1)
+                            arguments = json.loads(args_str)
+                            
+                            tool_calls.append({
+                                "function": {
+                                    "name": tool_name,
+                                    "arguments": json.dumps(arguments)
+                                }
+                            })
+                            logging.info(f"Extracted tool call from context: {tool_name} with args: {arguments}")
+                            break
+                            
+                        except json.JSONDecodeError:
+                            continue
+        
+        logging.info(f"Final tool calls extracted: {len(tool_calls)}")
         return tool_calls
     
     def format_tools_for_provider(self, tools: List[Dict[str, Any]]) -> Any:

@@ -163,9 +163,79 @@ except Exception as e:
             })
         
         if self.config['run_ai_tests'] and not self.args.skip_external:
+            # Add AI connectivity checks first
             test_suites.append({
-                'name': 'ai_tests',
-                'description': 'AI Provider Tests',
+                'name': 'ai_connectivity',
+                'description': 'AI Connectivity Check',
+                'command': ['python', '-c', '''
+import sys
+import os
+import asyncio
+import httpx
+from datetime import datetime
+
+print(f"🔌 AI Connectivity Test - {datetime.now()}")
+print("=" * 50)
+
+# Check environment
+ollama_endpoint = os.getenv("OLLAMA_ENDPOINT", "http://host.docker.internal:11434")
+current_model = os.getenv("CURRENT_AI_MODEL", "mock_assistant")
+
+print(f"🔍 Ollama Endpoint: {ollama_endpoint}")
+print(f"🔍 Current Model: {current_model}")
+
+async def test_ollama():
+    try:
+        print(f"\\n🔗 Testing connection to {ollama_endpoint}...")
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(f"{ollama_endpoint}/api/tags")
+            
+            if response.status_code == 200:
+                data = response.json()
+                models = data.get("models", [])
+                model_names = [m.get("name", "") for m in models]
+                
+                print(f"✅ Connection successful!")
+                print(f"📋 Available models ({len(models)}):")
+                for model in models:
+                    name = model.get("name", "unknown")
+                    size = model.get("size", 0)
+                    size_mb = size / (1024*1024) if size else 0
+                    print(f"  - {name} ({size_mb:.1f}MB)")
+                
+                # Check if target model exists
+                target_found = any(current_model.replace("ollama_", "").replace("_", ":") in name for name in model_names)
+                if target_found:
+                    print(f"✅ Target model found in available models")
+                else:
+                    print(f"⚠️  Target model {current_model} not found")
+                    print(f"💡 You may need to run: ollama pull <model_name>")
+                    
+            else:
+                print(f"❌ HTTP {response.status_code}: {response.text[:200]}")
+                sys.exit(1)
+                
+    except httpx.ConnectError as e:
+        print(f"❌ Connection failed: {e}")
+        print("💡 Possible solutions:")
+        print("  - Check if Ollama is running: ollama serve")
+        print("  - Check if Docker can reach host: ping host.docker.internal")
+        print("  - Verify port forwarding (WSL2): netsh interface portproxy...")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+        sys.exit(1)
+
+asyncio.run(test_ollama())
+print("\\n🎉 AI connectivity test passed!")
+'''],
+                'critical': False
+            })
+            
+            # Then run the comprehensive AI tests
+            test_suites.append({
+                'name': 'ai_function_tests',
+                'description': 'AI Function Calling Tests',
                 'command': ['python', 'enhanced_function_calling_test.py'],
                 'critical': False
             })

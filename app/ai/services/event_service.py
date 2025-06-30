@@ -44,8 +44,9 @@ class EventService:
             
             if not current_draft:
                 return {
-                    "success": False,
-                    "error": "No event draft found for this conversation"
+                    "success": True,
+                    "message": "No event draft created yet. Start describing your event to see it appear here!",
+                    "empty_state": True
                 }
             
             # Format event fields for display
@@ -95,6 +96,16 @@ class EventService:
                 <div class="alert alert-warning">
                     <h4>⚠️ No Event Preview Available</h4>
                     <p>{preview_data.get("error", "Unable to generate event preview")}</p>
+                </div>
+                """
+            
+            # Handle empty state (no draft yet)
+            if preview_data.get("empty_state"):
+                return f"""
+                <div class="empty-state">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📅</div>
+                    <h4>No Event Data Yet</h4>
+                    <p>Start describing your event in the chat, and watch it appear here!</p>
                 </div>
                 """
                 

@@ -1,0 +1,105 @@
+{
+  "timestamp": "2025-06-30T16:09:05.095315",
+  "results": {
+    "environment": {
+      "success": false,
+      "error": "(psycopg2.OperationalError) could not translate host name \"db\" to address: Name or service not known\n\n(Background on this error at: https://sqlalche.me/e/20/e3q8)"
+    },
+    "ai_provider": {
+      "provider": "MockAIProvider",
+      "connectivity": {
+        "connected": true,
+        "reason": "Non-Ollama provider"
+      },
+      "basic_completion": {
+        "success": true,
+        "response_time": 4.4000043999403715e-06
+      }
+    },
+    "basic_function_calling": {
+      "response_time": 3.6999990697950125e-06,
+      "response": {
+        "content": "\u26a0\ufe0f No AI model is currently available. Please configure a proper AI model (Ollama, OpenAI, or Anthropic) in Admin > AI Models.",
+        "tool_calls": null,
+        "provider": "mock",
+        "model": "test-assistant",
+        "error": "No real AI provider configured"
+      },
+      "analysis": {
+        "has_function_calls": false,
+        "function_calls": [],
+        "mentions_function": false,
+        "has_content": true,
+        "response_type": "plain_text"
+      }
+    },
+    "event_creation": {
+      "skipped": true,
+      "reason": "no_test_user"
+    },
+    "ai_agent": {
+      "skipped": true,
+      "reason": "no_test_user"
+    }
+  },
+  "debug_log": [
+    "[16:08:56] \ud83e\uddea Enhanced Function Calling Test Suite",
+    "[16:08:56] ============================================================",
+    "[16:08:56] \n\ud83d\udd0d Phase 1: Environment Check",
+    "[16:08:56] ----------------------------------------",
+    "[16:08:58] \u274c Environment check failed: (psycopg2.OperationalError) could not translate host name \"db\" to address: Name or service not known\n\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+    "[16:08:58] \n\ud83e\udd16 Phase 2: AI Provider Connectivity",
+    "[16:08:58] ----------------------------------------",
+    "[16:09:03] \ud83d\udd27 Provider: MockAIProvider",
+    "[16:09:03] \ud83d\udd27 Model: test-assistant",
+    "[16:09:03] \ud83d\udd27 Endpoint: local://mock",
+    "[16:09:03] \u2139\ufe0f  Non-Ollama provider: MockAIProvider",
+    "[16:09:03] \n\ud83e\uddea Testing basic completion...",
+    "[16:09:03] \u2705 Basic completion successful (0.00s)",
+    "[16:09:03] \ud83d\udcdd Response: \u26a0\ufe0f No AI model is currently available. Please configure a proper AI model (Ollama, OpenAI, or Anthro...",
+    "[16:09:03] \n\ud83d\udcde Phase 3: Basic Function Calling Test",
+    "[16:09:03] ----------------------------------------",
+    "[16:09:05] \ud83e\uddea Sending function calling request...",
+    "[16:09:05] \ud83d\udccb Tool definition: {\n  \"type\": \"function\",\n  \"function\": {\n    \"name\": \"debug_test_function\",\n    \"description\": \"A simple function to test function calling capability\",\n    \"parameters\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"message\": {\n          \"type\": \"string\",\n          \"description\": \"A test message to echo back\"\n        },\n        \"number\": {\n          \"type\": \"integer\",\n          \"description\": \"A test number\"\n        }\n      },\n      \"required\": [\n        \"message\",\n        \"number\"\n      ]\n    }\n  }\n}",
+    "[16:09:05] \u23f1\ufe0f  Response received (0.00s)",
+    "[16:09:05] \ud83d\udccb Full response: {\n  \"content\": \"\\u26a0\\ufe0f No AI model is currently available. Please configure a proper AI model (Ollama, OpenAI, or Anthropic) in Admin > AI Models.\",\n  \"tool_calls\": null,\n  \"provider\": \"mock\",\n  \"model\": \"test-assistant\",\n  \"error\": \"No real AI provider configured\"\n}",
+    "[16:09:05] \u26a0\ufe0f  No function calls detected",
+    "[16:09:05] \ud83d\udd27 Troubleshooting suggestions:",
+    "[16:09:05]    - Try a different model that supports function calling",
+    "[16:09:05]    - Check if the model requires specific prompt formatting",
+    "[16:09:05]    - Verify the tool schema format",
+    "[16:09:05] \n\ud83c\udfaf Phase 4: Event Creation Function Test",
+    "[16:09:05] ----------------------------------------",
+    "[16:09:05] \u26a0\ufe0f  Skipping event creation test - no test user",
+    "[16:09:05] \n\ud83e\udd1d Phase 5: AI Agent Integration Test",
+    "[16:09:05] ----------------------------------------",
+    "[16:09:05] \u26a0\ufe0f  Skipping AI agent test - no test user",
+    "[16:09:05] \n\ud83d\udccb Test Results Summary",
+    "[16:09:05] ============================================================",
+    "[16:09:05] \ud83d\udcca Test Statistics:",
+    "[16:09:05]    \u2705 Successful: 2",
+    "[16:09:05]    \u274c Failed: 1",
+    "[16:09:05]    \u23ed\ufe0f  Skipped: 2",
+    "[16:09:05]    \ud83d\udccb Total: 5",
+    "[16:09:05] \n\ud83d\udccb Detailed Results:",
+    "[16:09:05]    \u274c environment: Failed - (psycopg2.OperationalError) could not translate host name \"db\" to address: Name or service not known\n\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+    "[16:09:05]    \u2705 ai_provider: Passed",
+    "[16:09:05]    \u2705 basic_function_calling: Passed",
+    "[16:09:05]    \u23ed\ufe0f  event_creation: Skipped (no_test_user)",
+    "[16:09:05]    \u23ed\ufe0f  ai_agent: Skipped (no_test_user)",
+    "[16:09:05] \n\ud83d\udca1 Recommendations and Next Steps:",
+    "[16:09:05]    \ud83d\udd27 Fix database connection issues first",
+    "[16:09:05]    \ud83d\udca1 Run: alembic upgrade head",
+    "[16:09:05]    \ud83d\udcde Function calling not supported by current model:",
+    "[16:09:05]       - Try a different model that supports function calling",
+    "[16:09:05]       - Consider using text-based function parsing",
+    "[16:09:05]       - Check if model requires specific prompting",
+    "[16:09:05] \n\ud83d\udd27 For detailed debugging, run: python scripts/debug_ai_agent.py"
+  ],
+  "summary": {
+    "total": 5,
+    "successful": 2,
+    "failed": 1,
+    "skipped": 2
+  }
+}

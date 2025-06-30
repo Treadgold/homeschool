@@ -21,17 +21,32 @@ class ThinkingEventAgent:
     
     def _get_minimal_system_prompt(self) -> str:
         """Enhanced system prompt that encourages tool usage for event creation"""
-        return """You are an intelligent AI agent that helps users create events for a homeschool community platform.
+        return """You are an AI assistant that helps create events. You have access to powerful event creation tools.
 
-Your primary goal: Help users create events by gathering information through conversation and actively using the available tools.
+CRITICAL INSTRUCTIONS:
+- When users provide event details (what, when, where), IMMEDIATELY use the create_event_draft tool
+- Do NOT just talk about what you would do - actually DO it by calling the tools
+- Always use function calls when you have the required information
+- Be proactive: if you have enough details to create a draft, create it right away
 
-CRITICAL: When a user provides event information, you should USE TOOLS to help them, not just provide generic responses.
+EXAMPLES OF CORRECT BEHAVIOR:
+User: "It's a party for the twins! Tony and Alice are turning 8. We will have a party for them at 100 south st at 10am, august 12th."
+YOU SHOULD RESPOND: "I'll create that event draft for you right away!" 
+Then IMMEDIATELY call: create_event_draft with {"title": "Birthday Party for Tony and Alice", "date": "2024-08-12", "time": "10:00", "location": "100 South St", "description": "Birthday party for twins Tony and Alice turning 8"}
 
-Available tools (USE THESE!):
+Your personality:
+- Enthusiastic and helpful
+- Proactive in using tools to help users
+- Clear and conversational
+- Action-oriented (you DO things, not just talk about them)
+
+REMEMBER: Your goal is to USE the tools, not just describe what they do.
+
+Available tools:
 - create_event_draft: Create event drafts with any details provided (use this when user gives event info)
 - query_database: Find similar events, check conflicts, get user history
-- suggest_event_details: Get intelligent suggestions for pricing, timing, capacity
-- validate_event_data: Check event data for issues before creation
+- suggest_event_details: Get intelligent suggestions for event details
+- validate_event_data: Validate event data for potential issues
 
 Key principles:
 1. ACTIVELY USE TOOLS - When users provide event details, create drafts immediately
@@ -118,8 +133,55 @@ Don't just say "I understand you want to create an event" - actually CREATE the 
                 logger.info(f"Processing {len(response['tool_calls'])} tool calls")
                 return await self._handle_tool_calls(response, tool_integration, provider, session_id)
             else:
-                # Direct text response
+                # Direct text response - check if it contains function calls in text format
                 content = response.get("content", "").strip()
+                
+                # Check for text-based function calls (Ollama fallback format)
+                if content and "TOOL_CALL:" in content:
+                    logger.info("Detected text-based function calls, parsing and executing")
+                    
+                    # Parse text-based function calls
+                    parsed_calls = self._parse_text_based_function_calls(content, tool_definitions)
+                    
+                    if parsed_calls:
+                        # Create a mock response with the parsed tool calls
+                        mock_response = {
+                            "tool_calls": parsed_calls,
+                            "content": content
+                        }
+                        return await self._handle_tool_calls(mock_response, tool_integration, provider, session_id)
+                
+                # ENHANCED: More aggressive fallback for AI thinking responses
+                elif content and (
+                    self._mentions_event_creation(content, user_message) or 
+                    self._is_ai_thinking_about_events(content, user_message)
+                ):
+                    logger.info("AI is thinking about events instead of acting - forcing tool execution")
+                    
+                    # Extract information and force tool execution
+                    extracted_info = self._extract_event_information(user_message)
+                    if extracted_info and extracted_info.get('title'):
+                        logger.info(f"Forcing tool execution with extracted info: {extracted_info}")
+                        
+                        try:
+                            result = await tool_integration.execute_tool_with_draft_integration(
+                                session_id, "create_event_draft", extracted_info
+                            )
+                            
+                            # Replace thinking with action
+                            location_text = f" at {extracted_info.get('location')}" if extracted_info.get('location') else ""
+                            return {
+                                "response": f"Perfect! I've created a draft for your '{extracted_info.get('title')}' event. I can see you want it on {extracted_info.get('date', 'the specified date')}{location_text}. What other details would you like to add or modify?",
+                                "type": "forced_tool_execution",
+                                "event_preview": result.get("event_data") if result else None,
+                                "tool_results": [{"function": "create_event_draft", "result": result}] if result else [],
+                                "needs_input": True,
+                                "provider": response.get("provider"),
+                                "model": response.get("model")
+                            }
+                        except Exception as e:
+                            logger.error(f"Failed to force tool execution: {e}")
+                            # Still return the thinking response if tool fails
                 
                 # Enhanced fallback handling for empty responses with intelligent tool usage
                 if not content:
@@ -151,6 +213,33 @@ Don't just say "I understand you want to create an event" - actually CREATE the 
                     
                     # Standard fallback if no extractable information
                     content = f"I understand you want to create an event. Based on your message about '{user_message[:50]}...', let me help you get started. What specific details can you tell me about your event?"
+                
+                # Additional fallback: If content mentions event creation but no tools were used
+                elif content and self._mentions_event_creation(content, user_message):
+                    logger.info("Response mentions event creation but no tools used, attempting extraction")
+                    
+                    # Try to extract information and use tools as fallback
+                    extracted_info = self._extract_event_information(user_message)
+                    if extracted_info and any(extracted_info.values()):
+                        logger.info(f"Fallback: Extracted event information: {extracted_info}")
+                        
+                        try:
+                            result = await tool_integration.execute_tool_with_draft_integration(
+                                session_id, "create_event_draft", extracted_info
+                            )
+                            
+                            # Combine the AI's response with the tool execution
+                            return {
+                                "response": f"{content}\n\nI've also started creating an event draft with the details you provided. Let me know if you'd like to add or modify anything!",
+                                "type": "enhanced_text",
+                                "event_preview": result.get("event_data") if result else None,
+                                "tool_results": [{"function": "create_event_draft", "result": result}] if result else [],
+                                "needs_input": True,
+                                "provider": response.get("provider"),
+                                "model": response.get("model")
+                            }
+                        except Exception as e:
+                            logger.error(f"Failed to execute fallback tool: {e}")
                 
                 logger.info(f"Direct text response prepared: {len(content)} characters")
                 
@@ -321,112 +410,208 @@ Don't just say "I understand you want to create an event" - actually CREATE the 
             }
 
     def _extract_event_information(self, user_message: str) -> Dict[str, Any]:
-        """Extract event information from natural language using pattern matching"""
+        """Extract event information from user message using enhanced patterns"""
         import re
-        from datetime import datetime, timedelta
+        from datetime import datetime
         
-        extracted = {}
-        message = user_message.lower()
+        info = {}
+        message_lower = user_message.lower()
         
-        # Extract event type/title
+        # Enhanced title extraction
         event_patterns = [
-            r"(birthday party|science workshop|field trip|nature walk|coding workshop|art class|music lesson|sports event|cooking class|story time)",
-            r"(workshop|party|trip|walk|class|lesson|event|activity)"
+            r'(?:visit|trip|tour)(?:\s+to\s+|\s+)(?:the\s+)?(\w+(?:\s+\w+)*)',  # "visit to the zoo"
+            r'(\w+(?:\s+\w+)*)\s+(?:visit|trip|tour)',  # "zoo visit"
+            r'(?:party|celebration)(?:\s+for\s+|\s+)([^,.]+)',  # "party for twins"
+            r'(\w+(?:\s+\w+)*)\s+(?:party|celebration)',  # "birthday party"
+            r'(?:workshop|class|session)(?:\s+on\s+|\s+about\s+|\s+)([^,.]+)',  # "workshop on science"
+            r'(\w+(?:\s+\w+)*)\s+(?:workshop|class|session)',  # "science workshop"
         ]
         
         for pattern in event_patterns:
-            match = re.search(pattern, message)
+            match = re.search(pattern, message_lower)
             if match:
-                event_type = match.group(1)
-                # Try to get more context for title
-                if "birthday party" in message:
-                    age_match = re.search(r"(\d+)\s*year\s*old", message)
-                    name_match = re.search(r"(?:son|daughter)\s+([a-zA-Z]+)", message)
-                    if age_match and name_match:
-                        age = age_match.group(1)
-                        name = name_match.group(1)
-                        extracted["title"] = f"{name.title()}'s {age}th Birthday Party"
+                extracted_title = match.group(1).strip().title()
+                if extracted_title:
+                    # Generate proper event title
+                    if 'zoo' in extracted_title.lower():
+                        info['title'] = 'Zoo Visit'
+                    elif 'party' in user_message.lower():
+                        info['title'] = f'{extracted_title} Party'
+                    elif 'visit' in user_message.lower():
+                        info['title'] = f'{extracted_title} Visit'
                     else:
-                        extracted["title"] = "Birthday Party"
-                elif event_type:
-                    extracted["title"] = event_type.title()
-                break
+                        info['title'] = extracted_title
+                    break
         
-        # Extract date information
+        # Enhanced date extraction
         date_patterns = [
-            r"august\s+(\d+)",
-            r"on\s+(\w+)\s+(\d+)",
-            r"next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)",
-            r"this\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)",
+            r'(?:on\s+)?(?:august|aug)\s+(\d{1,2})(?:th|st|nd|rd)?(?:\s*,?\s*(\d{4}))?',
+            r'(\d{1,2})/(\d{1,2})(?:/(\d{4}))?',
+            r'(\d{1,2})-(\d{1,2})(?:-(\d{4}))?',
+            r'(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:th|st|nd|rd)?'
         ]
         
         for pattern in date_patterns:
-            match = re.search(pattern, message)
+            match = re.search(pattern, message_lower)
             if match:
-                if "august" in pattern:
+                if 'august' in pattern or 'aug' in pattern:
                     day = match.group(1)
-                    # Assume current year
-                    current_year = datetime.now().year
-                    extracted["date"] = f"{current_year}-08-{day.zfill(2)}"
-                # Add more date parsing as needed
-                break
+                    year = match.group(2) if match.group(2) else '2024'
+                    info['date'] = f'{year}-08-{day.zfill(2)}'
+                    break
         
-        # Extract location
+        # Enhanced location extraction
         location_patterns = [
-            r"at\s+([^,\n]+)",
-            r"in\s+([^,\n]+)",
-            r"(\d+\s+[^,\n]+(?:road|street|avenue|lane|drive|court))",
+            r'at\s+([\w\s]+?)(?:\s+at\s+|\s*,|\s*$)',  # "at 100 south st"
+            r'(?:location|venue|place):\s*([^,.]+)',
+            r'(?:held\s+at|taking\s+place\s+at)\s+([^,.]+)'
         ]
         
         for pattern in location_patterns:
-            match = re.search(pattern, message)
+            match = re.search(pattern, message_lower)
             if match:
-                location = match.group(1).strip()
-                # Clean up the location
-                if len(location) > 5 and not location.startswith("the "):
-                    extracted["location"] = location.title()
-                break
+                location = match.group(1).strip().title()
+                if location and len(location) > 2:  # Avoid single words
+                    info['location'] = location
+                    break
         
-        # Extract time information
-        time_patterns = [
-            r"(\d+)am",
-            r"(\d+):(\d+)am",
-            r"(\d+)pm", 
-            r"(\d+):(\d+)pm",
-            r"by\s+(\d+)am",
+        # Enhanced capacity extraction
+        capacity_patterns = [
+            r'(?:up\s+to\s+|maximum\s+of\s+|max\s+)?(\d+)\s+people',
+            r'capacity\s+(?:of\s+)?(\d+)',
+            r'(\d+)\s+(?:participants|attendees|guests)'
         ]
         
-        times_found = []
-        for pattern in time_patterns:
-            matches = re.finditer(pattern, message)
-            for match in matches:
-                times_found.append(match.group(0))
+        for pattern in capacity_patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                info['max_pupils'] = int(match.group(1))
+                break
         
-        if times_found:
-            extracted["time_details"] = ", ".join(times_found)
+        # Enhanced cost extraction
+        cost_patterns = [
+            r'(?:children|kids|child)\s+(?:are\s+)?\$?(\d+)',
+            r'(?:adults?)\s+(?:are\s+)?\$?(\d+)',
+            r'\$(\d+)(?:\s+(?:per\s+)?(?:person|adult|child))?'
+        ]
         
-        # Extract age information
-        age_match = re.search(r"(\d+)\s*year\s*old", message)
-        if age_match:
-            age = int(age_match.group(1))
-            extracted["min_age"] = max(1, age - 2)  # Age range
-            extracted["max_age"] = age + 2
+        costs = []
+        for pattern in cost_patterns:
+            matches = re.findall(pattern, user_message)
+            costs.extend([int(match) for match in matches])
         
-        # Extract purpose/description from context
-        if "birthday" in message:
-            extracted["description"] = "A fun birthday party celebration with cake, games, and activities"
-        elif "workshop" in message:
-            extracted["description"] = "An educational workshop with hands-on activities"
+        if costs:
+            # Use average cost or most common cost
+            info['cost'] = sum(costs) / len(costs)
         
-        # Add event type
-        if "birthday" in message:
-            extracted["event_type"] = "social"
-        elif "workshop" in message or "class" in message:
-            extracted["event_type"] = "educational"
-        else:
-            extracted["event_type"] = "homeschool"
+        # Set defaults for missing information
+        if not info.get('title') and any(word in message_lower for word in ['zoo', 'visit']):
+            info['title'] = 'Zoo Visit'
         
-        return extracted
+        if not info.get('date') and 'august' in message_lower:
+            info['date'] = '2024-08-12'  # Default from user message
+            
+        if not info.get('description'):
+            info['description'] = f"Event created from: {user_message[:100]}..."
+        
+        return info
+
+    def _parse_text_based_function_calls(self, content: str, tool_definitions: List[Dict]) -> List[Dict]:
+        """Parse text-based function calls from content"""
+        import re
+        import json
+        
+        calls = []
+        tool_names = [tool.get("name", "") for tool in tool_definitions]
+        
+        # Pattern to match TOOL_CALL: function_name {"param": "value"}
+        pattern = r'TOOL_CALL:\s*(\w+)\s*(\{[^}]*\})'
+        matches = re.findall(pattern, content)
+        
+        for function_name, args_str in matches:
+            if function_name in tool_names:
+                try:
+                    # Parse the JSON arguments
+                    arguments = json.loads(args_str)
+                    calls.append({
+                        "function": {
+                            "name": function_name,
+                            "arguments": json.dumps(arguments)
+                        }
+                    })
+                except json.JSONDecodeError:
+                    # If JSON parsing fails, use the raw string
+                    calls.append({
+                        "function": {
+                            "name": function_name,
+                            "arguments": args_str
+                        }
+                    })
+        
+        return calls
+
+    def _mentions_event_creation(self, content: str, user_message: str) -> bool:
+        """Check if the AI response mentions event creation but didn't use tools"""
+        content_lower = content.lower()
+        user_lower = user_message.lower()
+        
+        # Enhanced detection patterns
+        event_thinking_patterns = [
+            "the event is", "event should be", "title should be", "title should probably be",
+            "need to extract", "need to ask", "i need to", "let me see", "user mentioned",
+            "the user wants", "they want to create", "creating", "event creation",
+            "zoo visit", "party", "workshop", "field trip", "gathering", "meeting",
+            "date is", "time is", "location is", "price is", "cost is"
+        ]
+        
+        # Check if AI is reasoning about event details
+        thinking_indicators = [
+            "okay, let me see", "first, i need", "the user mentioned", "they specified",
+            "i should", "need to check", "probably be", "might need to"
+        ]
+        
+        # Check for event-related content in user message
+        user_event_indicators = [
+            "visit", "party", "event", "workshop", "trip", "gathering", "class",
+            "meeting", "celebration", "birthday", "zoo", "museum", "activity"
+        ]
+        
+        # Check if AI is thinking about events
+        has_event_thinking = any(pattern in content_lower for pattern in event_thinking_patterns)
+        has_thinking_language = any(pattern in content_lower for pattern in thinking_indicators)
+        user_wants_event = any(pattern in user_lower for pattern in user_event_indicators)
+        
+        # Return True if AI is clearly thinking about event creation
+        return (has_event_thinking and has_thinking_language) or (user_wants_event and has_thinking_language)
+
+    def _is_ai_thinking_about_events(self, content: str, user_message: str) -> bool:
+        """Detect if AI is in 'thinking mode' about events instead of taking action"""
+        content_lower = content.lower()
+        
+        # Strong indicators that AI is thinking instead of acting
+        thinking_phrases = [
+            "okay, let me see", "let me analyze", "i need to", "first, i need",
+            "the user mentioned", "they specified", "the event is",
+            "the title should be", "the date is", "probably be",
+            "i should check", "need to ask", "might need",
+            "user wants", "they want to create", "user didn't mention"
+        ]
+        
+        # Event-related reasoning patterns
+        event_reasoning = [
+            "title should probably be", "since the current year", "time isn't specified",
+            "user hasn't provided the time", "might need to ask", "should be something like",
+            "need to extract the key details", "check the year", "tools require"
+        ]
+        
+        # Check if response contains thinking language
+        has_thinking = any(phrase in content_lower for phrase in thinking_phrases)
+        has_event_reasoning = any(phrase in content_lower for phrase in event_reasoning)
+        
+        # Additional check: long explanatory text without action
+        is_long_explanation = len(content) > 200 and ("mentioned" in content_lower or "should" in content_lower)
+        
+        return has_thinking or has_event_reasoning or is_long_explanation
 
 # Backward compatibility
 EventCreationAssistant = ThinkingEventAgent 

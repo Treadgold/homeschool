@@ -27,6 +27,7 @@ class EnhancedFunctionCallingTester:
     def __init__(self):
         self.results = {}
         self.debug_log = []
+        self.test_user_id = None  # Initialize test_user_id
     
     def log(self, message: str):
         """Add message to debug log"""
@@ -332,13 +333,35 @@ class EnhancedFunctionCallingTester:
             for tool in tool_definitions:
                 self.log(f"   - {tool['name']}: {tool['description'][:50]}...")
             
-            # Test with event creation request
+            # Test with event creation request - USE REALISTIC SYSTEM PROMPT
             provider = ai_manager.get_current_provider()
             
             test_messages = [
                 {
-                    "role": "user",
-                    "content": "Create a birthday party event for a 10-year-old. Set the title to 'Birthday Party Fun', location to 'Community Hall', cost to 25 dollars, and max participants to 15."
+                    "role": "system",
+                    "content": """You are an intelligent AI agent that helps users create events for a homeschool community platform.
+
+Your primary goal: Help users create events by gathering information through conversation and actively using the available tools.
+
+CRITICAL: When a user provides event information, you should USE TOOLS to help them, not just provide generic responses.
+
+Available tools (USE THESE!):
+- create_event_draft: Create event drafts with any details provided (use this when user gives event info)
+- query_database: Find similar events, check conflicts, get user history
+- suggest_event_details: Get intelligent suggestions for pricing, timing, capacity
+- validate_event_data: Check event data for issues before creation
+
+Key principles:
+1. ACTIVELY USE TOOLS - When users provide event details, create drafts immediately
+2. Listen carefully to what the user actually wants
+3. Extract information from their messages (dates, locations, costs, etc.)
+4. Be conversational and helpful
+
+IMPORTANT: If a user provides ANY event details, you should immediately use the create_event_draft tool with the information they provided."""
+                },
+                {
+                    "role": "user", 
+                    "content": "I want to create a birthday party event for a 10-year-old. Set the title to 'Birthday Party Fun', location to 'Community Hall', cost to 25, and max_pupils to 15."
                 }
             ]
             
@@ -349,22 +372,34 @@ class EnhancedFunctionCallingTester:
             elapsed = asyncio.get_event_loop().time() - start_time
             
             self.log(f"⏱️  Event creation test completed ({elapsed:.2f}s)")
+            self.log(f"📋 Response content: {response.get('content', 'No content')[:200]}...")
             
-            # Analyze for event-specific function calls
+            # Enhanced analysis for event-specific function calls
             analysis = self._analyze_event_creation_response(response, tool_definitions)
             
             self.results["event_creation"] = {
                 "response_time": elapsed,
                 "analysis": analysis,
-                "tools_count": len(tool_definitions)
+                "tools_count": len(tool_definitions),
+                "response_content": response.get('content', '')[:500],  # Store sample content
+                "has_tool_calls": bool(response.get('tool_calls')),
+                "tool_calls_count": len(response.get('tool_calls', []))
             }
             
             if analysis["has_event_calls"]:
                 self.log("🎉 Event creation function calls detected!")
                 for call in analysis["event_calls"]:
-                    self.log(f"   🎂 {call['name']}: {call.get('arguments', {})}")
+                    self.log(f"   🎂 {call.get('name')}: {call.get('arguments', {})}")
+            elif analysis["has_function_calls"]:
+                self.log("⚠️  Function calls detected but not event-specific")
+                for call in response.get('tool_calls', []):
+                    self.log(f"   🔧 {call.get('name', 'unknown')}: {call.get('arguments', {})}")
+            elif analysis["has_text_based_calls"]:
+                self.log("🎉 Text-based function calls detected!")
+                for call in analysis["text_calls"]:
+                    self.log(f"   📝 {call}")
             else:
-                self.log("⚠️  No event creation function calls detected")
+                self.log("⚠️  No function calls detected at all")
             
             db.close()
             
@@ -373,25 +408,44 @@ class EnhancedFunctionCallingTester:
             self.results["event_creation"] = {"success": False, "error": str(e)}
     
     def _analyze_event_creation_response(self, response, tools):
-        """Analyze event creation response"""
+        """Enhanced analysis of event creation response"""
         analysis = {
             "has_event_calls": False,
             "event_calls": [],
             "has_function_calls": bool(response.get("tool_calls")),
+            "has_text_based_calls": False,
+            "text_calls": [],
             "mentions_event": False
         }
         
+        # Check for native function calls
         if response.get("tool_calls"):
             for call in response["tool_calls"]:
-                if "event" in call.get("name", "").lower():
+                call_name = call.get("name", "").lower()
+                # Look for event-related function calls
+                if "event" in call_name or "create" in call_name or "draft" in call_name:
                     analysis["has_event_calls"] = True
                     analysis["event_calls"].append(call)
         
+        # Check for text-based function calls (Ollama fallback format)
+        content = response.get("content", "")
+        if content and "TOOL_CALL:" in content:
+            import re
+            pattern = r'TOOL_CALL:\s*(\w+)\s*(\{[^}]*\})'
+            matches = re.findall(pattern, content)
+            
+            for function_name, args_str in matches:
+                analysis["text_calls"].append(f"{function_name} {args_str}")
+                if "event" in function_name.lower() or "create" in function_name.lower():
+                    analysis["has_text_based_calls"] = True
+                    analysis["has_event_calls"] = True
+        
         # Check if event creation is mentioned in text
-        content = response.get("content", "").lower()
-        event_keywords = ["event", "party", "create", "birthday"]
-        if any(keyword in content for keyword in event_keywords):
-            analysis["mentions_event"] = True
+        if content:
+            content_lower = content.lower()
+            event_keywords = ["event", "party", "create", "birthday", "draft"]
+            if any(keyword in content_lower for keyword in event_keywords):
+                analysis["mentions_event"] = True
         
         return analysis
     

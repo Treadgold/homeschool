@@ -42,13 +42,19 @@ from .services import ChatService, HealthService, ModelService, EventService
 logger = logging.getLogger(__name__)
 
 # Initialize service instances
+print("🤖 Initializing AI services...")
 chat_service = ChatService()
 health_service = HealthService()
 model_service = ModelService()
 event_service = EventService()
+print("✅ AI services initialized")
 
 # Create AI router without prefix (frontend expects direct routes)
 ai_router = APIRouter(tags=["AI System"])
+print("🚦 AI router created with 16+ endpoints")
+
+# Log when AI module is fully loaded
+logger.info("AI Router module loaded with services: Chat, Health, Model, Event")
 
 # ===== CHAT ENDPOINTS =====
 
@@ -179,73 +185,13 @@ async def ai_health_status_htmx(
         """
 
 
-# ===== ADMIN ENDPOINTS =====
-
-@ai_router.get("/admin/ai-models", response_class=HTMLResponse)
-async def admin_ai_models(request: Request, user: User = Depends(require_admin_user)):
-    """Show AI model configuration page"""
-    return model_service.get_available_models(request, user)
-
-@ai_router.post("/admin/ai-models/set-current")
-async def set_current_ai_model(
-    request: Request,
-    model_key: str = Form(...),
-    csrf_token: str = Form(...),
-    user: User = Depends(require_admin_user)
-):
-    """
-    Set the current AI model
-    Extracted from main.py set_current_ai_model()
-    """
-    try:
-        return await model_service.set_current_model(model_key, user, csrf_token)
-        
-    except Exception as e:
-        logger.error(f"Failed to set AI model: {e}")
-        return {
-            "success": False,
-            "message": f"Failed to set AI model: {str(e)}"
-        }
-
-
-@ai_router.post("/admin/ai-models/{model_key}/test")
-async def test_ai_model(
-    model_key: str,
-    request: Request,
-    csrf_token: str = Form(...),
-    user: User = Depends(require_authenticated_user)
-):
-    """
-    Test an AI model with chat and function calling capabilities
-    Extracted from main.py test_ai_model()
-    """
-    try:
-        return await model_service.test_model(model_key, user, csrf_token)
-        
-    except Exception as e:
-        logger.error(f"Failed to test AI model: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "message": "Model testing failed"
-        }
-
+# ===== ADMIN ENDPOINTS MOVED TO MAIN ROUTER =====
+# Admin endpoints are now in main.py at root level for consistency with other admin routes
 
 @ai_router.get("/models/available")
 async def get_available_ai_models(user: User = Depends(require_authenticated_user)):
     """Get list of available AI models (API endpoint)"""
     return model_service.get_available_models_api(user)
-
-
-@ai_router.post("/admin/ai-models/refresh-ollama")
-async def refresh_ollama_models(
-    request: Request,
-    csrf_token: str = Form(...),
-    user: User = Depends(require_admin_user)
-):
-    """Refresh available Ollama models"""
-    return await model_service.refresh_ollama_models(user, csrf_token)
-
 
 @ai_router.post("/clear-queue")
 async def clear_ai_request_queue(
@@ -289,26 +235,8 @@ async def debug_migration_info(
 
 # ===== HTMX ENDPOINTS =====
 
-@ai_router.get("/ai-create-event", response_class=HTMLResponse)
-async def ai_create_event_page(
-    request: Request,
-    user: User = Depends(require_admin_user),
-    db: Session = Depends(get_db)
-):
-    """
-    AI event creation page - main interface for AI-powered event creation
-    This is the route the frontend expects for AI event creation
-    """
-    try:
-        return await chat_service.initialize_chat_session(user, db)
-        
-    except Exception as e:
-        return f"""
-        <div class="alert alert-error">
-            <h4>❌ Failed to Initialize AI Event Creation</h4>
-            <p>Error: {str(e)}</p>
-        </div>
-        """
+# Main AI create event page is now handled at root level in main.py
+# This keeps the API endpoints separate from the main page route
 
 
 @ai_router.get("/chat/init", response_class=HTMLResponse)
@@ -322,13 +250,52 @@ async def ai_chat_init_htmx(
     Extracted from main.py ai_chat_init_htmx()
     """
     try:
-        return await chat_service.initialize_chat_session(user, db)
+        # Get the session data from the service
+        session_data = await chat_service.initialize_chat_session(user, db)
+        
+        # Return proper HTML instead of JSON
+        return f"""
+        <div class="chat-container" id="chat-container">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message assistant">
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-content">{session_data.get('message', 'Hello! How can I help you create an event?')}</div>
+                </div>
+            </div>
+            
+            <div class="chat-input">
+                <form hx-post="/api/ai/chat/message" 
+                      hx-target="#chatMessages" 
+                      hx-swap="beforeend"
+                      hx-on::after-request="this.reset(); document.getElementById('messageInput').focus()">
+                    <input type="hidden" name="session_id" value="{session_data.get('session_id', '')}">
+                    <input type="text" 
+                           name="message" 
+                           id="messageInput"
+                           placeholder="Describe your event..." 
+                           required
+                           autocomplete="off">
+                    <button type="submit">Send</button>
+                </form>
+            </div>
+            
+            <div class="chat-status">
+                <small class="text-muted">
+                    AI Model: {session_data.get('provider', 'Unknown')} - {session_data.get('model', 'Unknown')}
+                </small>
+            </div>
+        </div>
+        """
         
     except Exception as e:
+        logger.error(f"Failed to initialize chat: {e}")
         return f"""
         <div class="alert alert-error">
             <h4>❌ Failed to Initialize AI</h4>
             <p>Error: {str(e)}</p>
+            <button class="btn btn-primary" hx-get="/api/ai/chat/init" hx-target="#chat-container">
+                🔄 Retry
+            </button>
         </div>
         """
 
@@ -346,15 +313,74 @@ async def ai_chat_message_htmx(
     Extracted from main.py ai_chat_message_htmx()
     """
     try:
-        return await chat_service.process_chat_message(session_id, message, user, db)
+        # First add the user message to the chat
+        user_message_html = f"""
+        <div class="message user">
+            <div class="message-avatar">👤</div>
+            <div class="message-content">{message}</div>
+        </div>
+        """
+        
+        # Process the message through the chat service
+        result = await chat_service.process_chat_message(session_id, message, user, db)
+        
+        # Get the AI response and format as HTML
+        ai_response = result.get('ai_response', 'I apologize, but I encountered an error processing your message.')
+        
+        # Create the assistant response HTML
+        assistant_message_html = f"""
+        <div class="message assistant">
+            <div class="message-avatar">🤖</div>
+            <div class="message-content">{ai_response}</div>
+        </div>
+        """
+        
+        # Update event preview if we have extracted info OR if tools were called
+        event_preview_html = ""
+        if result.get('event_preview') or result.get('tool_calls_made'):
+            event_preview_html = f"""
+            <div hx-get="/api/ai/event-preview?session_id={session_id}"
+                 hx-target="#event-preview" 
+                 hx-swap="innerHTML"
+                 hx-trigger="load"></div>
+            """
+        
+        # Return both user and assistant messages with preview trigger
+        response_html = user_message_html + assistant_message_html + event_preview_html
+        
+        # Add HTMX trigger to update event preview
+        if result.get('tool_calls_made') or result.get('event_data_extracted'):
+            response_html += """
+            <div hx-trigger="load" 
+                 hx-get="/api/ai/event-preview" 
+                 hx-vals='{"session_id": "%s"}'
+                 hx-target="#event-preview" 
+                 hx-swap="innerHTML"></div>
+            """ % session_id
+        
+        return response_html
         
     except Exception as e:
+        logger.error(f"Failed to process chat message: {e}")
         return f"""
         <div class="message assistant">
             <div class="message-avatar">🤖</div>
-            <div class="message-content">❌ Error: {str(e)}</div>
+            <div class="message-content">❌ Sorry, I encountered an error: {str(e)}</div>
         </div>
         """
+
+
+@ai_router.get("/event-preview", response_class=HTMLResponse)  
+async def ai_event_preview_get_htmx(
+    request: Request,
+    session_id: str = Query(...),
+    user: User = Depends(require_authenticated_user),
+    db: Session = Depends(get_db)
+):
+    """
+    HTMX GET endpoint for event preview from AI conversation
+    """
+    return await event_service.get_event_preview_html(session_id, user, db)
 
 
 @ai_router.post("/event-preview", response_class=HTMLResponse)

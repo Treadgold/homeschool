@@ -20,7 +20,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://user:pass@db:5432/homeschool
       - REDIS_URL=redis://redis:6379
-      - OLLAMA_ENDPOINT=http://ollama:11434
+      - OLLAMA_ENDPOINT=http://host.docker.internal:11434
       # Test configuration - passed through from .env
       - RUN_TESTS_ON_BUILD=${RUN_TESTS_ON_BUILD:-true}
       - RUN_UNIT_TESTS=${RUN_UNIT_TESTS:-true}
@@ -79,25 +79,9 @@ services:
     networks:
       - homeschool-network
 
-  # Ollama service for AI functionality
-  ollama:
-    image: ollama/ollama:latest
-    container_name: homeschool-ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - homeschool-network
-    # Uncomment if you have GPU support
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+  # Ollama service - REMOVED
+  # Using external Ollama instance running on host system
+  # Connect via host.docker.internal:11434
 
   # Test service - for running tests in isolation
   test:
@@ -114,7 +98,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://user:pass@db:5432/homeschool
       - TEST_DATABASE_URL=sqlite:///./test.db
-      - OLLAMA_ENDPOINT=http://ollama:11434
+      - OLLAMA_ENDPOINT=http://host.docker.internal:11434
       # Enable all tests for dedicated test runs
       - RUN_UNIT_TESTS=true
       - RUN_INTEGRATION_TESTS=true
@@ -127,7 +111,6 @@ services:
     depends_on:
       - db
       - redis
-      - ollama
     networks:
       - homeschool-network
     profiles:
@@ -144,12 +127,11 @@ services:
       - ./test_results:/app/test_results
     environment:
       - DATABASE_URL=postgresql://user:pass@db:5432/homeschool
-      - OLLAMA_ENDPOINT=http://ollama:11434
+      - OLLAMA_ENDPOINT=http://host.docker.internal:11434
     command: python scripts/debug_ai_agent.py
     depends_on:
       - db
       - redis
-      - ollama
     networks:
       - homeschool-network
     profiles:
@@ -160,7 +142,6 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  ollama_data:
   static_files:
 
 networks:
