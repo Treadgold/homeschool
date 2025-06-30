@@ -460,14 +460,33 @@
                     {% elif booking.payment_status == 'unpaid' %}
                     <span class="meta-tag danger">❌ Unpaid</span>
                     {% endif %}
+                    {% if booking.booking_status == 'cancellation_requested' %}
+                    <span class="meta-tag danger">🚫 Cancellation Requested</span>
+                    {% elif booking.booking_status == 'cancelled' %}
+                    <span class="meta-tag danger">❌ Cancelled</span>
+                    {% endif %}
                 </div>
                 
                 <div class="booking-actions">
                     <a href="mailto:{{ booking.child.user.email }}?subject=Regarding {{ event.title }}&body=Hi,%0D%0A%0D%0AI'm contacting you regarding your child {{ booking.child.name }}'s booking for {{ event.title }}.%0D%0A%0D%0AEvent Details:%0D%0A- Date: {{ event.date.strftime('%B %d, %Y at %I:%M %p') }}%0D%0A- Location: {{ event.location or 'TBD' }}%0D%0A%0D%0APlease let me know if you have any questions.%0D%0A%0D%0ABest regards," class="btn btn-primary">📧 Send Email</a>
-                    <form method="POST" action="/admin/bookings/{{ booking.id }}/cancel" style="display: inline;" onsubmit="return confirm('Are you sure you want to cancel this booking? This action cannot be undone.')">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="submit" class="btn btn-danger">❌ Cancel Booking</button>
-                    </form>
+                    
+                    {% if booking.booking_status == 'cancellation_requested' %}
+                        <form method="POST" action="/admin/bookings/{{ booking.id }}/approve-cancellation" style="display: inline;" onsubmit="return confirm('Are you sure you want to approve this cancellation request?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="refund_amount" value="{{ event.cost or 0 }}">
+                            <button type="submit" class="btn btn-success">✅ Approve Cancellation</button>
+                        </form>
+                        <form method="POST" action="/admin/bookings/{{ booking.id }}/deny-cancellation" style="display: inline;" onsubmit="return confirm('Are you sure you want to deny this cancellation request?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="denial_reason" value="Cancellation denied by admin">
+                            <button type="submit" class="btn btn-danger">❌ Deny Request</button>
+                        </form>
+                    {% else %}
+                        <form method="POST" action="/admin/bookings/{{ booking.id }}/cancel" style="display: inline;" onsubmit="return confirm('Are you sure you want to cancel this booking? This action cannot be undone.')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn btn-danger">❌ Cancel Booking</button>
+                        </form>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -533,14 +552,33 @@
                         {% elif booking.payment_status == 'unpaid' %}
                         <span class="meta-tag danger">❌ Unpaid</span>
                         {% endif %}
+                        {% if booking.booking_status == 'cancellation_requested' %}
+                        <span class="meta-tag danger">🚫 Cancellation Requested</span>
+                        {% elif booking.booking_status == 'cancelled' %}
+                        <span class="meta-tag danger">❌ Cancelled</span>
+                        {% endif %}
                     </div>
                     
                     <div class="booking-actions">
                         <a href="mailto:{{ booking.adult.user.email }}?subject=Regarding {{ event.title }}&body=Hi {{ booking.adult.name }},%0D%0A%0D%0AI'm contacting you regarding your booking for {{ event.title }}.%0D%0A%0D%0AEvent Details:%0D%0A- Date: {{ event.date.strftime('%B %d, %Y at %I:%M %p') }}%0D%0A- Location: {{ event.location or 'TBD' }}%0D%0A{% if booking.role %}- Your Role: {{ booking.role|capitalize }}%0D%0A{% endif %}%0D%0APlease let me know if you have any questions.%0D%0A%0D%0ABest regards," class="btn btn-primary">📧 Send Email</a>
-                        <form method="POST" action="/admin/adult-bookings/{{ booking.id }}/cancel" style="display: inline;" onsubmit="return confirm('Are you sure you want to cancel this adult booking? This action cannot be undone.')">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <button type="submit" class="btn btn-danger">❌ Cancel Booking</button>
-                        </form>
+                        
+                        {% if booking.booking_status == 'cancellation_requested' %}
+                            <form method="POST" action="/admin/adult-bookings/{{ booking.id }}/approve-cancellation" style="display: inline;" onsubmit="return confirm('Are you sure you want to approve this cancellation request?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="refund_amount" value="{{ event.cost or 0 }}">
+                                <button type="submit" class="btn btn-success">✅ Approve Cancellation</button>
+                            </form>
+                            <form method="POST" action="/admin/adult-bookings/{{ booking.id }}/deny-cancellation" style="display: inline;" onsubmit="return confirm('Are you sure you want to deny this cancellation request?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="denial_reason" value="Cancellation denied by admin">
+                                <button type="submit" class="btn btn-danger">❌ Deny Request</button>
+                            </form>
+                        {% else %}
+                            <form method="POST" action="/admin/adult-bookings/{{ booking.id }}/cancel" style="display: inline;" onsubmit="return confirm('Are you sure you want to cancel this adult booking? This action cannot be undone.')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit" class="btn btn-danger">❌ Cancel Booking</button>
+                            </form>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}

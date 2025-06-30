@@ -3079,4 +3079,298 @@ async def refresh_ollama_models(
             "message": f"Failed to refresh models: {str(e)}"
         }
 
+@app.get("/admin/cancellation-requests", response_class=HTMLResponse)
+async def admin_cancellation_requests(request: Request, user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Admin page to view and manage all cancellation requests"""
+    
+    # Get all bookings with cancellation requests
+    cancellation_requests = db.query(Booking).filter(
+        Booking.booking_status == "cancellation_requested"
+    ).join(Event).join(Child).join(User).order_by(Booking.cancellation_requested_at.desc()).all()
+    
+    # Get adult booking cancellation requests too
+    adult_cancellation_requests = db.query(AdultBooking).filter(
+        AdultBooking.booking_status == "cancellation_requested"
+    ).join(Event).join(Adult).join(User).order_by(AdultBooking.cancellation_requested_at.desc()).all()
+    
+    # Calculate statistics
+    total_requests = len(cancellation_requests) + len(adult_cancellation_requests)
+    paid_requests = len([b for b in cancellation_requests if b.payment_status == 'paid']) + \
+                   len([b for b in adult_cancellation_requests if b.payment_status == 'paid'])
+    total_refund_amount = sum(b.event.cost or 0 for b in cancellation_requests if b.payment_status == 'paid') + \
+                         sum(b.event.cost or 0 for b in adult_cancellation_requests if b.payment_status == 'paid')
+    
+    stats = {
+        "total_requests": total_requests,
+        "paid_requests": paid_requests,
+        "total_refund_amount": total_refund_amount
+    }
+    
+    return templates.TemplateResponse("admin_cancellation_requests.html", {
+        "request": request,
+        "current_user": user,
+        "cancellation_requests": cancellation_requests,
+        "adult_cancellation_requests": adult_cancellation_requests,
+        "stats": stats,
+        "csrf_token": generate_csrf_token()
+    })
+
+@app.post("/admin/bookings/{booking_id}/approve-cancellation", response_class=HTMLResponse)
+async def approve_booking_cancellation(
+    request: Request,
+    booking_id: int,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    refund_amount: float = Form(None),
+    refund_reason: str = Form(None),
+    csrf_token: str = Form(None)
+):
+    """Approve a booking cancellation and process refund if needed"""
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        raise HTTPException(status_code=400, detail="Invalid CSRF token")
+    
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    if booking.booking_status != "cancellation_requested":
+        raise HTTPException(status_code=400, detail="Booking is not pending cancellation")
+    
+    # Process refund if payment was made
+    if booking.payment_status == 'paid' and booking.event.cost and booking.event.cost > 0:
+        # Calculate refund amount (default to full amount if not specified)
+        refund_amount = refund_amount or float(booking.event.cost)
+        
+        # Process refund through payment service
+        payment_service = get_payment_service()
+        if booking.stripe_payment_id:
+            refund_result = payment_service.process_refund(
+                payment_intent_id=booking.stripe_payment_id,
+                amount_cents=int(refund_amount * 100),
+                reason=refund_reason or "Customer cancellation approved"
+            )
+            
+            if refund_result['success']:
+                booking.refund_processed = True
+                booking.refund_amount = refund_amount
+                booking.refund_processed_at = datetime.utcnow()
+            else:
+                # Log refund failure but still approve cancellation
+                print(f"Refund failed for booking {booking_id}: {refund_result.get('error')}")
+        else:
+            # Manual refund tracking
+            booking.refund_processed = True
+            booking.refund_amount = refund_amount
+            booking.refund_processed_at = datetime.utcnow()
+    
+    # Approve the cancellation
+    booking.booking_status = "cancelled"
+    booking.cancelled_at = datetime.utcnow()
+    booking.cancellation_approved_by = user.id
+    booking.cancellation_approved_at = datetime.utcnow()
+    
+    db.commit()
+    
+    # Send notification email to customer
+    try:
+        refund_info = ""
+        if booking.refund_processed:
+            refund_info = f"""
+Refund Amount: ${booking.refund_amount:.2f}
+Refund Reason: {refund_reason or "Customer cancellation approved"}
+
+Your refund will be processed within 5-10 business days.
+"""
+        
+        customer_email_body = f"""
+Your cancellation request has been approved.
+
+Event: {booking.event.title}
+Date: {booking.event.date.strftime('%B %d, %Y at %I:%M %p')}
+Child: {booking.child.name}
+
+{refund_info}
+Thank you for your understanding.
+"""
+        send_email(booking.child.user.email, f"Cancellation Approved - {booking.event.title}", customer_email_body)
+    except Exception as e:
+        print(f"Failed to send customer notification: {e}")
+    
+    return RedirectResponse(url="/admin/cancellation-requests", status_code=HTTP_303_SEE_OTHER)
+
+@app.post("/admin/bookings/{booking_id}/deny-cancellation", response_class=HTMLResponse)
+async def deny_booking_cancellation(
+    request: Request,
+    booking_id: int,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    denial_reason: str = Form(...),
+    csrf_token: str = Form(None)
+):
+    """Deny a booking cancellation request"""
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        raise HTTPException(status_code=400, detail="Invalid CSRF token")
+    
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    if booking.booking_status != "cancellation_requested":
+        raise HTTPException(status_code=400, detail="Booking is not pending cancellation")
+    
+    # Revert to confirmed status
+    booking.booking_status = "confirmed"
+    booking.cancellation_requested_at = None
+    booking.cancellation_reason = None
+    
+    db.commit()
+    
+    # Send notification email to customer
+    try:
+        customer_email_body = f"""
+        Your cancellation request has been denied.
+        
+        Event: {booking.event.title}
+        Date: {booking.event.date.strftime('%B %d, %Y at %I:%M %p')}
+        Child: {booking.child.name}
+        
+        Reason: {denial_reason}
+        
+        Your booking remains confirmed. Please contact us if you have any questions.
+        """
+        send_email(booking.child.user.email, f"Cancellation Denied - {booking.event.title}", customer_email_body)
+    except Exception as e:
+        print(f"Failed to send customer notification: {e}")
+    
+    return RedirectResponse(url="/admin/cancellation-requests", status_code=HTTP_303_SEE_OTHER)
+
+@app.post("/admin/adult-bookings/{booking_id}/approve-cancellation", response_class=HTMLResponse)
+async def approve_adult_booking_cancellation(
+    request: Request,
+    booking_id: int,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    refund_amount: float = Form(None),
+    refund_reason: str = Form(None),
+    csrf_token: str = Form(None)
+):
+    """Approve an adult booking cancellation and process refund if needed"""
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        raise HTTPException(status_code=400, detail="Invalid CSRF token")
+    
+    booking = db.query(AdultBooking).filter(AdultBooking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Adult booking not found")
+    
+    if booking.booking_status != "cancellation_requested":
+        raise HTTPException(status_code=400, detail="Adult booking is not pending cancellation")
+    
+    # Process refund if payment was made
+    if booking.payment_status == 'paid' and booking.event.cost and booking.event.cost > 0:
+        # Calculate refund amount (default to full amount if not specified)
+        refund_amount = refund_amount or float(booking.event.cost)
+        
+        # Process refund through payment service
+        payment_service = get_payment_service()
+        if booking.stripe_payment_id:
+            refund_result = payment_service.process_refund(
+                payment_intent_id=booking.stripe_payment_id,
+                amount_cents=int(refund_amount * 100),
+                reason=refund_reason or "Customer cancellation approved"
+            )
+            
+            if refund_result['success']:
+                booking.refund_processed = True
+                booking.refund_amount = refund_amount
+                booking.refund_processed_at = datetime.utcnow()
+            else:
+                # Log refund failure but still approve cancellation
+                print(f"Refund failed for adult booking {booking_id}: {refund_result.get('error')}")
+        else:
+            # Manual refund tracking
+            booking.refund_processed = True
+            booking.refund_amount = refund_amount
+            booking.refund_processed_at = datetime.utcnow()
+    
+    # Approve the cancellation
+    booking.booking_status = "cancelled"
+    booking.cancelled_at = datetime.utcnow()
+    booking.cancellation_approved_by = user.id
+    booking.cancellation_approved_at = datetime.utcnow()
+    
+    db.commit()
+    
+    # Send notification email to customer
+    try:
+        refund_info = ""
+        if booking.refund_processed:
+            refund_info = f"""
+Refund Amount: ${booking.refund_amount:.2f}
+Refund Reason: {refund_reason or "Customer cancellation approved"}
+
+Your refund will be processed within 5-10 business days.
+"""
+        
+        customer_email_body = f"""
+Your cancellation request has been approved.
+
+Event: {booking.event.title}
+Date: {booking.event.date.strftime('%B %d, %Y at %I:%M %p')}
+Adult: {booking.adult.name}
+
+{refund_info}
+Thank you for your understanding.
+"""
+        send_email(booking.adult.user.email, f"Cancellation Approved - {booking.event.title}", customer_email_body)
+    except Exception as e:
+        print(f"Failed to send customer notification: {e}")
+    
+    return RedirectResponse(url="/admin/cancellation-requests", status_code=HTTP_303_SEE_OTHER)
+
+@app.post("/admin/adult-bookings/{booking_id}/deny-cancellation", response_class=HTMLResponse)
+async def deny_adult_booking_cancellation(
+    request: Request,
+    booking_id: int,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    denial_reason: str = Form(...),
+    csrf_token: str = Form(None)
+):
+    """Deny an adult booking cancellation request"""
+    if not csrf_token or not verify_csrf_token(csrf_token):
+        raise HTTPException(status_code=400, detail="Invalid CSRF token")
+    
+    booking = db.query(AdultBooking).filter(AdultBooking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Adult booking not found")
+    
+    if booking.booking_status != "cancellation_requested":
+        raise HTTPException(status_code=400, detail="Adult booking is not pending cancellation")
+    
+    # Revert to confirmed status
+    booking.booking_status = "confirmed"
+    booking.cancellation_requested_at = None
+    booking.cancellation_reason = None
+    
+    db.commit()
+    
+    # Send notification email to customer
+    try:
+        customer_email_body = f"""
+        Your cancellation request has been denied.
+        
+        Event: {booking.event.title}
+        Date: {booking.event.date.strftime('%B %d, %Y at %I:%M %p')}
+        Adult: {booking.adult.name}
+        
+        Reason: {denial_reason}
+        
+        Your booking remains confirmed. Please contact us if you have any questions.
+        """
+        send_email(booking.adult.user.email, f"Cancellation Denied - {booking.event.title}", customer_email_body)
+    except Exception as e:
+        print(f"Failed to send customer notification: {e}")
+    
+    return RedirectResponse(url="/admin/cancellation-requests", status_code=HTTP_303_SEE_OTHER)
+
 

@@ -1,0 +1,542 @@
+{% extends "base.html" %}
+
+{% block title %}Cancellation Requests - Admin{% endblock %}
+
+{% block extra_head %}
+<style>
+    .cancellation-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+    
+    .page-header h1 {
+        margin: 0 0 0.5rem 0;
+        font-size: 2rem;
+        font-weight: 600;
+    }
+    
+    .page-header p {
+        margin: 0;
+        opacity: 0.9;
+        font-size: 1.1rem;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-align: center;
+        border-left: 4px solid #dc3545;
+    }
+    
+    .stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #dc3545;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    .requests-section {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+        margin-bottom: 2rem;
+    }
+    
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .section-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #dc3545;
+        margin: 0;
+    }
+    
+    .request-count {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 500;
+    }
+    
+    .request-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.5rem;
+        border: 1px solid #e9ecef;
+        margin-bottom: 1rem;
+        border-left: 4px solid #dc3545;
+    }
+    
+    .request-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+    
+    .participant-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .participant-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: #dc3545;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+    
+    .participant-details h3 {
+        margin: 0 0 0.3rem 0;
+        color: #333;
+        font-size: 1.2rem;
+    }
+    
+    .participant-details p {
+        margin: 0;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    .request-meta {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin: 1rem 0;
+        padding: 1rem 0;
+        border-top: 1px solid #e9ecef;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .meta-tag {
+        background: #e9ecef;
+        padding: 0.3rem 0.6rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        color: #495057;
+    }
+    
+    .meta-tag.warning {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .meta-tag.danger {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .meta-tag.success {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .meta-tag.info {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    .request-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.2s;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+        margin-right: 0.5rem;
+    }
+    
+    .btn-success {
+        background: #28a745;
+        color: white;
+    }
+    
+    .btn-success:hover {
+        background: #218838;
+    }
+    
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-danger:hover {
+        background: #c82333;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background: #545b62;
+    }
+    
+    .no-requests {
+        text-align: center;
+        padding: 3rem;
+        color: #6c757d;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border: 2px dashed #dee2e6;
+    }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+    }
+    
+    .modal-content {
+        background-color: white;
+        margin: 15% auto;
+        padding: 2rem;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 500px;
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .close {
+        color: #aaa;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    
+    .close:hover {
+        color: #000;
+    }
+    
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+    
+    .form-group input,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+    
+    .form-group textarea {
+        height: 100px;
+        resize: vertical;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cancellation-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1>🚫 Cancellation Requests</h1>
+        <p>Review and manage customer cancellation requests</p>
+    </div>
+    
+    <!-- Statistics -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.total_requests }}</div>
+            <div class="stat-label">Total Requests</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.paid_requests }}</div>
+            <div class="stat-label">Paid Bookings</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">${{ "%.2f"|format(stats.total_refund_amount) }}</div>
+            <div class="stat-label">Total Refund Amount</div>
+        </div>
+    </div>
+    
+    <!-- Children Cancellation Requests -->
+    <div class="requests-section">
+        <div class="section-header">
+            <h2 class="section-title">👶 Children Cancellation Requests</h2>
+            <span class="request-count">{{ cancellation_requests|length }} requests</span>
+        </div>
+        
+        {% if cancellation_requests %}
+            {% for booking in cancellation_requests %}
+            <div class="request-card">
+                <div class="request-header">
+                    <div class="participant-info">
+                        <div class="participant-avatar">{{ booking.child.name[0]|upper }}</div>
+                        <div class="participant-details">
+                            <h3>{{ booking.child.name }}</h3>
+                            <p>Age: {{ booking.child.age }} • {{ booking.child.user.email }}</p>
+                            <p>Requested: {{ booking.cancellation_requested_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <a href="mailto:{{ booking.child.user.email }}" class="btn btn-secondary">📧 Contact</a>
+                    </div>
+                </div>
+                
+                <div class="request-meta">
+                    <span class="meta-tag info">📅 {{ booking.event.title }}</span>
+                    <span class="meta-tag info">📆 {{ booking.event.date.strftime('%B %d, %Y at %I:%M %p') }}</span>
+                    {% if booking.event.cost %}
+                    <span class="meta-tag warning">💰 ${{ "%.2f"|format(booking.event.cost) }}</span>
+                    {% endif %}
+                    {% if booking.payment_status == 'paid' %}
+                    <span class="meta-tag success">✅ Paid</span>
+                    {% else %}
+                    <span class="meta-tag danger">❌ Unpaid</span>
+                    {% endif %}
+                    {% if booking.cancellation_reason %}
+                    <span class="meta-tag">📝 {{ booking.cancellation_reason }}</span>
+                    {% endif %}
+                </div>
+                
+                <div class="request-actions">
+                    <button class="btn btn-success" onclick="showApproveModal('child', {{ booking.id }}, {{ booking.event.cost or 0 }})">
+                        ✅ Approve Cancellation
+                    </button>
+                    <button class="btn btn-danger" onclick="showDenyModal('child', {{ booking.id }})">
+                        ❌ Deny Request
+                    </button>
+                    <a href="/admin/events/{{ booking.event.id }}/bookings" class="btn btn-secondary">
+                        📋 View Event Bookings
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-requests">
+                <h3>No children cancellation requests</h3>
+                <p>All children bookings are confirmed.</p>
+            </div>
+        {% endif %}
+    </div>
+    
+    <!-- Adults Cancellation Requests -->
+    <div class="requests-section">
+        <div class="section-header">
+            <h2 class="section-title">👥 Adults Cancellation Requests</h2>
+            <span class="request-count">{{ adult_cancellation_requests|length }} requests</span>
+        </div>
+        
+        {% if adult_cancellation_requests %}
+            {% for booking in adult_cancellation_requests %}
+            <div class="request-card">
+                <div class="request-header">
+                    <div class="participant-info">
+                        <div class="participant-avatar">{{ booking.adult.name[0]|upper }}</div>
+                        <div class="participant-details">
+                            <h3>{{ booking.adult.name }}</h3>
+                            <p>{{ booking.adult.relationship_to_family|capitalize if booking.adult.relationship_to_family else 'Adult' }} • {{ booking.adult.user.email }}</p>
+                            <p>Requested: {{ booking.cancellation_requested_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <a href="mailto:{{ booking.adult.user.email }}" class="btn btn-secondary">📧 Contact</a>
+                    </div>
+                </div>
+                
+                <div class="request-meta">
+                    <span class="meta-tag info">📅 {{ booking.event.title }}</span>
+                    <span class="meta-tag info">📆 {{ booking.event.date.strftime('%B %d, %Y at %I:%M %p') }}</span>
+                    {% if booking.event.cost %}
+                    <span class="meta-tag warning">💰 ${{ "%.2f"|format(booking.event.cost) }}</span>
+                    {% endif %}
+                    {% if booking.payment_status == 'paid' %}
+                    <span class="meta-tag success">✅ Paid</span>
+                    {% else %}
+                    <span class="meta-tag danger">❌ Unpaid</span>
+                    {% endif %}
+                    {% if booking.role %}
+                    <span class="meta-tag info">🎭 {{ booking.role|capitalize }}</span>
+                    {% endif %}
+                    {% if booking.cancellation_reason %}
+                    <span class="meta-tag">📝 {{ booking.cancellation_reason }}</span>
+                    {% endif %}
+                </div>
+                
+                <div class="request-actions">
+                    <button class="btn btn-success" onclick="showApproveModal('adult', {{ booking.id }}, {{ booking.event.cost or 0 }})">
+                        ✅ Approve Cancellation
+                    </button>
+                    <button class="btn btn-danger" onclick="showDenyModal('adult', {{ booking.id }})">
+                        ❌ Deny Request
+                    </button>
+                    <a href="/admin/events/{{ booking.event.id }}/bookings" class="btn btn-secondary">
+                        📋 View Event Bookings
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-requests">
+                <h3>No adult cancellation requests</h3>
+                <p>All adult bookings are confirmed.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Approve Cancellation Modal -->
+<div id="approveModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Approve Cancellation</h3>
+            <span class="close" onclick="closeModal('approveModal')">&times;</span>
+        </div>
+        <form id="approveForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="form-group">
+                <label for="refund_amount">Refund Amount ($):</label>
+                <input type="number" id="refund_amount" name="refund_amount" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label for="refund_reason">Refund Reason (optional):</label>
+                <textarea id="refund_reason" name="refund_reason" placeholder="Reason for refund..."></textarea>
+            </div>
+            <div class="request-actions">
+                <button type="submit" class="btn btn-success">✅ Approve & Process Refund</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('approveModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Deny Cancellation Modal -->
+<div id="denyModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Deny Cancellation Request</h3>
+            <span class="close" onclick="closeModal('denyModal')">&times;</span>
+        </div>
+        <form id="denyForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="form-group">
+                <label for="denial_reason">Reason for Denial:</label>
+                <textarea id="denial_reason" name="denial_reason" placeholder="Please provide a reason for denying this cancellation request..." required></textarea>
+            </div>
+            <div class="request-actions">
+                <button type="submit" class="btn btn-danger">❌ Deny Request</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('denyModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showApproveModal(type, bookingId, eventCost) {
+    document.getElementById('refund_amount').value = eventCost;
+    document.getElementById('refund_amount').readOnly = eventCost === 0;
+    
+    const form = document.getElementById('approveForm');
+    if (type === 'child') {
+        form.action = `/admin/bookings/${bookingId}/approve-cancellation`;
+    } else {
+        form.action = `/admin/adult-bookings/${bookingId}/approve-cancellation`;
+    }
+    
+    document.getElementById('approveModal').style.display = 'block';
+}
+
+function showDenyModal(type, bookingId) {
+    const form = document.getElementById('denyForm');
+    if (type === 'child') {
+        form.action = `/admin/bookings/${bookingId}/deny-cancellation`;
+    } else {
+        form.action = `/admin/adult-bookings/${bookingId}/deny-cancellation`;
+    }
+    
+    document.getElementById('denyModal').style.display = 'block';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const approveModal = document.getElementById('approveModal');
+    const denyModal = document.getElementById('denyModal');
+    
+    if (event.target === approveModal) {
+        approveModal.style.display = 'none';
+    }
+    if (event.target === denyModal) {
+        denyModal.style.display = 'none';
+    }
+}
+</script>
+{% endblock %} 
