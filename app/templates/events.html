@@ -558,20 +558,19 @@
     </div>
 
     <!-- Events Filter -->
-    <div class="events-filter">
+    {% set event_types = events | map(attribute='event_type') | list | unique %}
+    <div class="events-filter dense">
         <span style="font-weight: 600; color: #495057;">Filter by:</span>
-        <button class="filter-btn active" onclick="filterEvents('all')">All Events</button>
-        <button class="filter-btn" onclick="filterEvents('workshop')">Workshops</button>
-        <button class="filter-btn" onclick="filterEvents('field-trip')">Field Trips</button>
-        <button class="filter-btn" onclick="filterEvents('social')">Social Events</button>
-        <button class="filter-btn" onclick="filterEvents('free')">Free Events</button>
-        
+        <button class="filter-btn dense active" onclick="filterEvents('all', this)">All Events</button>
+        {% for type in event_types %}
+            <button class="filter-btn dense" onclick="filterEvents('{{ type }}', this)">{{ type.replace('_', ' ') | title }}</button>
+        {% endfor %}
         <!-- View Toggle -->
-        <div class="view-toggle">
-            <button class="view-toggle-btn active" onclick="toggleView('list')" id="list-view-btn">
+        <div class="view-toggle dense">
+            <button class="view-toggle-btn dense active" onclick="toggleView('list')" id="list-view-btn">
                 <span>📋</span> List View
             </button>
-            <button class="view-toggle-btn" onclick="toggleView('map')" id="map-view-btn">
+            <button class="view-toggle-btn dense" onclick="toggleView('map')" id="map-view-btn">
                 <span>🗺️</span> Map View
             </button>
         </div>
@@ -893,52 +892,22 @@ function toggleView(viewType) {
     }
 }
 
-function filterEvents(type) {
+function filterEvents(type, btn) {
     const cards = document.querySelectorAll('.event-card');
     const filterBtns = document.querySelectorAll('.filter-btn');
-    
     // Update active filter button
-    filterBtns.forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
-    
+    filterBtns.forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
     // Filter events in list view
     cards.forEach(card => {
         const cardType = card.dataset.type;
-        const cardCost = parseFloat(card.dataset.cost);
-        
-        let shouldShow = false;
-        
-        switch(type) {
-            case 'all':
-                shouldShow = true;
-                break;
-            case 'workshop':
-                shouldShow = cardType === 'workshop';
-                break;
-            case 'field-trip':
-                shouldShow = cardType === 'offsite';
-                break;
-            case 'social':
-                shouldShow = cardType === 'social';
-                break;
-            case 'free':
-                shouldShow = cardCost === 0;
-                break;
-        }
-        
-        if (shouldShow) {
-            card.style.display = 'block';
-            setTimeout(() => card.style.opacity = '1', 10);
-        } else {
-            card.style.opacity = '0';
-            setTimeout(() => card.style.display = 'none', 200);
-        }
+        let shouldShow = (type === 'all') || (cardType === type);
+        card.style.display = shouldShow ? 'block' : 'none';
+        card.style.opacity = shouldShow ? '1' : '0';
     });
-    
-    // Filter markers in map view
-    if (isMapInitialized && markerClusterGroup) {
+    // Filter markers in map view (if needed)
+    if (typeof isMapInitialized !== 'undefined' && isMapInitialized && typeof markerClusterGroup !== 'undefined') {
         markerClusterGroup.clearLayers();
-        
         cards.forEach((card, index) => {
             if (card.style.display !== 'none' && markers[index]) {
                 markerClusterGroup.addLayer(markers[index]);

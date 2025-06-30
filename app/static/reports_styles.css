@@ -1,0 +1,103 @@
+/* Dense report styles for admin/report pages */
+@import url('/static/style.css');
+
+.dense, .dense * {
+    font-size: 0.92em !important;
+    padding: 0.15rem 0.3rem !important;
+    margin: 0 !important;
+    border-radius: 3px !important;
+    box-shadow: none !important;
+    background: none !important;
+}
+
+.admin-header.dense, .admin-actions.dense, .filters-section.dense, .filters-grid.dense, .event-header.dense, .event-card.dense, .event-meta.dense, .event-description.dense, .capacity-info.dense, .bookings-section.dense, .bookings-header.dense, .bookings-title.dense, .booking-count.dense, .bookings-table.dense, .no-bookings.dense, .no-events.dense {
+    padding: 0.2rem 0.4rem !important;
+    margin-bottom: 0.3rem !important;
+    background: none !important;
+    border-radius: 3px !important;
+    box-shadow: none !important;
+}
+
+.events-grid.dense {
+    gap: 0.5rem !important;
+}
+
+.event-card.dense {
+    border: 1px solid #e2e8f0 !important;
+    margin-top: 0.5rem !important;
+}
+
+.event-title.dense {
+    font-size: 1.1rem !important;
+    font-weight: 600 !important;
+    margin-bottom: 0 !important;
+}
+
+.event-meta.dense span {
+    margin-right: 0.5rem !important;
+    font-size: 0.85em !important;
+}
+
+.event-status.dense {
+    font-size: 0.8em !important;
+    padding: 0.1rem 0.4rem !important;
+}
+
+.capacity-info.dense {
+    font-size: 0.85em !important;
+    margin-bottom: 0.2rem !important;
+    padding: 0.1rem 0.3rem !important;
+}
+
+.capacity-bar.dense {
+    height: 6px !important;
+    margin: 0 0.3rem !important;
+}
+
+.capacity-fill.dense {
+    height: 100% !important;
+}
+
+.bookings-section.dense {
+    margin-top: 0.3rem !important;
+}
+
+.bookings-table.dense {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 0.92em !important;
+}
+
+.bookings-table.dense th, .bookings-table.dense td {
+    padding: 0.2rem 0.4rem !important;
+    border: 1px solid #e2e8f0 !important;
+    text-align: left !important;
+}
+
+.bookings-table.dense th {
+    background: #f8f9fa !important;
+    font-weight: 600 !important;
+}
+
+.bookings-table.dense td {
+    background: none !important;
+}
+
+.no-bookings.dense, .no-events.dense {
+    padding: 0.7rem !important;
+    font-size: 0.9em !important;
+    background: none !important;
+    border: none !important;
+}
+
+.event-actions.dense .btn {
+    min-width: 28px !important;
+    height: 28px !important;
+    font-size: 0.9em !important;
+    padding: 0.1rem 0.4rem !important;
+    margin: 0 0.1rem !important;
+}
+
+.inline-form {
+    display: inline !important;
+} 

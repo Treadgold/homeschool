@@ -1,32 +1,266 @@
 {% extends "base.html" %}
 {% block title %}Admin – User Management{% endblock %}
-{% block extra_head %}{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="/static/reports_styles.css">
+<style>
+.user-admin-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(44,62,80,0.08);
+    border: 1px solid #e9ecef;
+    padding: 2rem 2.5rem;
+    margin: 2rem auto 0 auto;
+    max-width: 1100px;
+}
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+    font-size: 0.97em;
+    background: #fff;
+}
+.users-table th, .users-table td {
+    padding: 0.7rem 1rem;
+    text-align: left;
+}
+.users-table th {
+    background: #f8f9fa;
+    color: #222;
+    font-weight: 600;
+    border-bottom: 1px solid #e2e8f0;
+    cursor: pointer;
+    user-select: none;
+}
+.users-table th.sort-asc::after { content: ' \25B2'; }
+.users-table th.sort-desc::after { content: ' \25BC'; }
+.users-table tr:nth-child(even) {
+    background: #f7fafc;
+}
+.users-table tr.current {
+    background: #e8f4fd !important;
+    color: #222 !important;
+}
+.admin-badge, .you-badge {
+    display: inline-block;
+    border-radius: 8px;
+    padding: 0.18rem 0.7rem;
+    font-size: 0.88em;
+    font-weight: 600;
+    margin-left: 0.3rem;
+    vertical-align: middle;
+    border: none;
+}
+.admin-badge {
+    background: #e6f4ea;
+    color: #217a47;
+    margin-left: 0;
+}
+.you-badge {
+    background: #e7f1fa;
+    color: #2366a8;
+    margin-left: 0.5rem;
+}
+.admin-cell {
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    gap: 0.3rem;
+}
+.bulk-bar {
+    display: none;
+    background: #e8f4fd;
+    border: 1px solid #b3d8f7;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    margin-bottom: 0.7rem;
+    align-items: center;
+    gap: 1rem;
+}
+.bulk-bar.active {
+    display: flex;
+}
+.bulk-btn {
+    background: #38a169;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.3rem 1rem;
+    font-size: 0.95em;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-right: 0.2rem;
+}
+.bulk-btn:hover {
+    background: #2f855a;
+}
+.action-btn {
+    background: #4299e1;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.2rem 0.7rem;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-right: 0.2rem;
+    box-shadow: 0 1px 4px rgba(44,62,80,0.07);
+}
+.action-btn:hover {
+    background: #2b6cb0;
+}
+.action-btn[disabled] {
+    background: #e2e8f0;
+    color: #aaa;
+    cursor: not-allowed;
+}
+@media (max-width: 900px) {
+    .user-admin-card { padding: 1rem 0.5rem; }
+    .users-table th, .users-table td { padding: 0.4rem 0.4rem; font-size: 0.95em; }
+    .users-table { font-size: 0.93em; }
+}
+.sticky-search {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 3;
+    padding-bottom: 0.5rem;
+}
+</style>
+{% endblock %}
 {% block content %}
-    <h2>User Management</h2>
-    <p>Logged in as: <strong>{{ current_user.email }}</strong> {% if current_user.is_admin %}<span class="admin">(admin)</span>{% endif %}</p>
-    <table>
-        <tr>
-            <th>ID</th>
-            <th>Email</th>
-            <th>Admin?</th>
-            <th>Actions</th>
-        </tr>
-        {% for user in users %}
-        <tr{% if user.id == current_user.id %} class="current"{% endif %}>
-            <td>{{ user.id }}</td>
-            <td>{{ user.email }}</td>
-            <td>{% if user.is_admin %}<span class="admin">Yes</span>{% else %}No{% endif %}</td>
-            <td>
-                {% if not user.is_admin %}
-                <form method="post" action="/admin/users/promote" style="display:inline;">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <input type="hidden" name="user_id" value="{{ user.id }}">
-                    <button type="submit">Promote to Admin</button>
-                </form>
-                {% else %}-{% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
-    <a href="/">Back to Home</a>
+<div class="user-admin-card">
+    <h2 style="margin-bottom:0.5rem;">User Management</h2>
+    <div style="margin-bottom:0.5rem;font-size:0.95em;">Logged in as: <strong>{{ current_user.email }}</strong> <span class="you-badge">You</span></div>
+    <div class="filters-section dense sticky-search" style="margin-bottom:0.5rem;">
+        <input type="text" id="userSearchInput" class="filter-input dense" placeholder="Search by email..." style="width:220px;">
+    </div>
+    <div id="bulkBar" class="bulk-bar">
+        <span id="bulkCount">0 selected</span>
+        <button class="bulk-btn" id="bulkPromoteBtn" title="Promote selected to Admin">Promote to Admin</button>
+        <button class="bulk-btn" id="bulkClearBtn" title="Clear selection">Clear</button>
+    </div>
+    <div class="table-container dense" style="overflow-x:auto;">
+        <table class="users-table dense" id="usersTable">
+            <thead>
+                <tr>
+                    <th style="width:32px;"><input type="checkbox" id="selectAll"></th>
+                    <th data-sort="id">ID</th>
+                    <th data-sort="email">Email</th>
+                    <th data-sort="admin">Admin?</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for user in users %}
+            <tr{% if user.id == current_user.id %} class="current"{% endif %} data-id="{{ user.id }}" data-email="{{ user.email|lower }}" data-admin="{{ 1 if user.is_admin else 0 }}">
+                <td><input type="checkbox" class="row-select" {% if user.is_admin %}disabled{% endif %}></td>
+                <td>{{ user.id }}</td>
+                <td>{{ user.email }}</td>
+                <td>
+                    <div class="admin-cell">
+                        {% if user.is_admin %}
+                            <span class="admin-badge">Admin</span>
+                        {% endif %}
+                        {% if user.id == current_user.id %}
+                            <span class="you-badge">You</span>
+                        {% endif %}
+                        {% if not user.is_admin and user.id != current_user.id %}
+                            <span style="color:#222;">No</span>
+                        {% endif %}
+                    </div>
+                </td>
+                <td>
+                    {% if not user.is_admin %}
+                    <form method="post" action="/admin/users/promote" class="inline-form" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="user_id" value="{{ user.id }}">
+                        <button type="submit" class="action-btn" title="Promote to Admin">⬆️</button>
+                    </form>
+                    {% else %}<span style="color:#bbb;">-</span>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <a href="/" class="btn btn-secondary dense" style="margin-top:0.7rem;">&larr; Back to Home</a>
+</div>
+<script>
+// Search filter
+const userSearchInput = document.getElementById('userSearchInput');
+userSearchInput.addEventListener('input', function() {
+    const searchTerm = this.value.toLowerCase();
+    const rows = document.querySelectorAll('.users-table tbody tr');
+    rows.forEach(row => {
+        const email = row.dataset.email;
+        row.style.display = email.includes(searchTerm) ? '' : 'none';
+    });
+    updateBulkBar();
+});
+
+// Sorting
+let sortCol = null;
+let sortDir = 1;
+const table = document.getElementById('usersTable');
+const headers = table.querySelectorAll('th[data-sort]');
+headers.forEach(header => {
+    header.addEventListener('click', function() {
+        const col = this.dataset.sort;
+        if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; }
+        headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+        this.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+        sortTable(col, sortDir);
+    });
+});
+function sortTable(col, dir) {
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr')).filter(row => row.style.display !== 'none');
+    rows.sort((a, b) => {
+        let va = a.dataset[col], vb = b.dataset[col];
+        if (col === 'id') { va = parseInt(va); vb = parseInt(vb); }
+        if (col === 'admin') { va = parseInt(va); vb = parseInt(vb); }
+        return (va > vb ? 1 : va < vb ? -1 : 0) * dir;
+    });
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Bulk selection
+const selectAll = document.getElementById('selectAll');
+const rowCheckboxes = document.querySelectorAll('.row-select');
+selectAll.addEventListener('change', function() {
+    rowCheckboxes.forEach(cb => { if (!cb.disabled && cb.closest('tr').style.display !== 'none') cb.checked = this.checked; });
+    updateBulkBar();
+});
+rowCheckboxes.forEach(cb => cb.addEventListener('change', updateBulkBar));
+function updateBulkBar() {
+    const checked = Array.from(document.querySelectorAll('.row-select:checked'));
+    const bar = document.getElementById('bulkBar');
+    const count = checked.length;
+    document.getElementById('bulkCount').textContent = count + ' selected';
+    bar.classList.toggle('active', count > 0);
+}
+document.getElementById('bulkClearBtn').onclick = function() {
+    rowCheckboxes.forEach(cb => cb.checked = false);
+    updateBulkBar();
+};
+// Bulk promote
+const bulkPromoteBtn = document.getElementById('bulkPromoteBtn');
+bulkPromoteBtn.onclick = function() {
+    const checked = Array.from(document.querySelectorAll('.row-select:checked'));
+    if (!checked.length) return;
+    if (!confirm('Promote ' + checked.length + ' user(s) to admin?')) return;
+    checked.forEach(cb => {
+        const row = cb.closest('tr');
+        const userId = row.dataset.id;
+        // Create and submit a form for each user
+        const form = document.createElement('form');
+        form.method = 'post';
+        form.action = '/admin/users/promote';
+        form.className = 'inline-form';
+        form.innerHTML = `<input type=\"hidden\" name=\"csrf_token\" value=\"{{ csrf_token }}\"><input type=\"hidden\" name=\"user_id\" value=\"${userId}\">`;
+        document.body.appendChild(form);
+        form.submit();
+    });
+};
+</script>
 {% endblock %} 

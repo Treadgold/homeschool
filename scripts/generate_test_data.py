@@ -23,7 +23,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'app'))
 
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
-from models import Base, Event, User, Child, Booking
+from models import Base, Event, User, Child, Booking, AdultBooking, Adult
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -72,7 +72,14 @@ LAST_NAMES = [
 ]
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    """Hash password using bcrypt with fallback for version issues"""
+    try:
+        return pwd_context.hash(password)
+    except Exception as e:
+        print(f"⚠️  Warning: bcrypt hashing failed, using simple hash: {e}")
+        # Fallback to simple hash for testing
+        import hashlib
+        return hashlib.sha256(password.encode()).hexdigest()
 
 def clear_existing_test_data(db: Session):
     """Clear existing test data to start fresh"""
@@ -81,7 +88,9 @@ def clear_existing_test_data(db: Session):
     try:
         # Delete in correct order to respect foreign keys
         db.query(Booking).delete()
+        db.query(AdultBooking).delete()  # Clear adult_bookings first
         db.query(Child).delete()
+        db.query(Adult).delete()  # Clear adults table
         
         # Delete test users (keep any admin users that aren't test users)
         test_emails = [f"parent{i+1}@example.com" for i in range(20)]
