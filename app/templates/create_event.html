@@ -1394,56 +1394,6 @@ function renderPreview() {
     const subtitle = document.getElementById('subtitle').value;
     const shortDesc = document.getElementById('short_description').value || 'Event description will appear here';
     const eventType = document.getElementById('event_type').value;
-    const startDate = document.getElementById('start_date').value;
-    const endDate = document.getElementById('end_date').value;
-    
-    let meta = '';
-    if (eventType) {
-        meta += eventType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-    }
-    if (startDate) {
-        const date = new Date(startDate);
-        meta += (meta ? ' • ' : '') + date.toLocaleDateString();
-    }
-    
-    document.getElementById('event-preview').innerHTML = `
-        <div class="preview-title">${title}</div>
-        ${subtitle ? `<div class="preview-subtitle" style="font-size: 16px; color: #666; margin-bottom: 10px;">${subtitle}</div>` : ''}
-        <div class="preview-meta">${meta}</div>
-        <div class="preview-description" style="margin-top: 15px; line-height: 1.5;">${shortDesc}</div>
-    `;
-}
-
-function attachEventListeners() {
-    // Navigation buttons
-    document.getElementById('next-btn').addEventListener('click', nextStep);
-    document.getElementById('prev-btn').addEventListener('click', prevStep);
-    
-    // Form field listeners for live preview
-    const previewFields = [
-        'title', 'subtitle', 'short_description', 'event_type', 'start_date', 'end_date',
-        'event_format', 'venue_name', 'address', 'city', 'max_participants', 'min_age', 'max_age',
-        'featured_image', 'ticket_name[]', 'ticket_price[]', 'website_url', 'contact_name'
-    ];
-    
-    previewFields.forEach(id => {
-        const element = document.getElementById(id.replace('[]', ''));
-        if (element) {
-            element.addEventListener('input', renderPreview);
-            element.addEventListener('change', renderPreview);
-        }
-    });
-    
-    // File upload listeners
-    document.getElementById('featured_image').addEventListener('change', handleImagePreview);
-}
-
-// Enhanced live preview function
-function renderPreview() {
-    const title = document.getElementById('title').value || 'Event Title';
-    const subtitle = document.getElementById('subtitle').value;
-    const shortDesc = document.getElementById('short_description').value || 'Event description will appear here';
-    const eventType = document.getElementById('event_type').value;
     const eventFormat = document.getElementById('event_format').value;
     const startDate = document.getElementById('start_date').value;
     const endDate = document.getElementById('end_date').value;
@@ -1490,13 +1440,20 @@ function renderPreview() {
         meta.push(`Ages: ${minAge}+`);
     }
     
-    // Get first ticket price if available
-    const firstTicketPrice = document.querySelector('input[name="ticket_price[]"]');
-    const ticketPrice = firstTicketPrice ? firstTicketPrice.value : '';
-    
+    // Collect all ticket types and prices
+    const ticketNames = document.querySelectorAll('input[name="ticket_name[]"]');
+    const ticketPrices = document.querySelectorAll('input[name="ticket_price[]"]');
+    let ticketSummary = [];
+    for (let i = 0; i < ticketNames.length; i++) {
+        const name = ticketNames[i].value.trim();
+        const price = ticketPrices[i] && ticketPrices[i].value ? parseFloat(ticketPrices[i].value).toFixed(2) : null;
+        if (name && price && price > 0) {
+            ticketSummary.push(`${name}: $${price}`);
+        }
+    }
     let priceDisplay = '';
-    if (ticketPrice && parseFloat(ticketPrice) > 0) {
-        priceDisplay = `<div class="preview-price" style="font-size: 18px; font-weight: bold; color: #28a745; margin-top: 10px;">$${parseFloat(ticketPrice).toFixed(2)}</div>`;
+    if (ticketSummary.length > 0) {
+        priceDisplay = `<div class="preview-price" style="font-size: 18px; font-weight: bold; color: #28a745; margin-top: 10px;">${ticketSummary.join(', ')}</div>`;
     } else if (document.getElementById('is_free') && document.getElementById('is_free').checked) {
         priceDisplay = `<div class="preview-price" style="font-size: 18px; font-weight: bold; color: #28a745; margin-top: 10px;">FREE</div>`;
     }
@@ -1509,6 +1466,30 @@ function renderPreview() {
         <div class="preview-description" style="line-height: 1.5;">${shortDesc}</div>
         ${priceDisplay}
     `;
+}
+
+function attachEventListeners() {
+    // Navigation buttons
+    document.getElementById('next-btn').addEventListener('click', nextStep);
+    document.getElementById('prev-btn').addEventListener('click', prevStep);
+    
+    // Form field listeners for live preview
+    const previewFields = [
+        'title', 'subtitle', 'short_description', 'event_type', 'start_date', 'end_date',
+        'event_format', 'venue_name', 'address', 'city', 'max_participants', 'min_age', 'max_age',
+        'featured_image', 'ticket_name[]', 'ticket_price[]', 'website_url', 'contact_name'
+    ];
+    
+    previewFields.forEach(id => {
+        const element = document.getElementById(id.replace('[]', ''));
+        if (element) {
+            element.addEventListener('input', renderPreview);
+            element.addEventListener('change', renderPreview);
+        }
+    });
+    
+    // File upload listeners
+    document.getElementById('featured_image').addEventListener('change', handleImagePreview);
 }
 
 // Handle image preview

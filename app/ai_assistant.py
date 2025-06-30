@@ -25,6 +25,12 @@ class ThinkingEventAgent:
 
 CRITICAL INSTRUCTIONS:
 - When users provide event details (what, when, where), IMMEDIATELY use the create_event_draft tool
+- After every draft update, use the critical field status helper to:
+    - Tell the user what important details you just added (e.g., "I've added the cost of tickets…").
+    - Clearly list any required details that are still missing (e.g., "I notice there is no start time, would you like to add a start time?").
+    - If all required details are present, confirm with the user before publishing (e.g., "All required details are present. Would you like to publish this event now, or add more information?").
+- Do NOT output long reasoning or step-by-step plans to the user. If you need to plan, do so internally and then act or ask the user for the next piece of information.
+- If you detect you are in 'thinking mode', immediately extract the next action and proceed, keeping any explanation to one or two sentences at most.
 - Do NOT just talk about what you would do - actually DO it by calling the tools
 - Always use function calls when you have the required information
 - Be proactive: if you have enough details to create a draft, create it right away
@@ -375,6 +381,32 @@ Don't just say "I understand you want to create an event" - actually CREATE the 
                     response_content = "I encountered some issues while processing your request. Could you provide more details about your event?"
                 else:
                     response_content = "I've processed your request. What would you like to do next with your event?"
+            
+            # Add a brief reflection step after tool use
+            reflection_message = {
+                "role": "system",
+                "content": f"Just added: {'; '.join(tool_context)}"
+            }
+            follow_up_messages.append(reflection_message)
+            
+            # Ask AI to reflect on the tool use
+            reflection_response = await provider.chat_completion(follow_up_messages)
+            
+            # Extract reflection content with fallback handling
+            reflection_content = reflection_response.get("content", "").strip()
+            
+            # FIX: Enhanced fallback for empty AI reflection responses
+            if not reflection_content:
+                logger.warning("AI provider returned empty reflection response, generating fallback")
+                
+                # Generate contextual fallback based on tool results
+                if any("create_event_draft" in str(result) for result in tool_results):
+                    if event_preview and event_preview.get("title"):
+                        reflection_content = f"Great! I've created a draft for your '{event_preview['title']}' event. What other details would you like to add or modify?"
+                    else:
+                        reflection_content = "I've created an initial event draft based on your request. What additional details would you like to include?"
+                elif any("error" in result for result in tool_results):
+                    reflection_content = "I've processed your request. What would you like to do next with your event?"
             
             return {
                 "response": response_content,

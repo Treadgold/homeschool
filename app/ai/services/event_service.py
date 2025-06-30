@@ -49,11 +49,17 @@ class EventService:
                     "empty_state": True
                 }
             
+            # Proof and enhance the draft before preview
+            current_draft = self.proof_event_description(current_draft)
+            
             # Format event fields for display
             event_fields = self._format_event_fields(current_draft)
             
             # Check if event can be created (has required fields)
             can_create = self._can_create_event(current_draft)
+            
+            # Optionally, get previous draft (not implemented here, so pass None)
+            critical_status = self.get_critical_field_status(current_draft, previous=None)
             
             return {
                 "success": True,
@@ -71,7 +77,8 @@ class EventService:
                 },
                 "event_fields": event_fields,
                 "can_create_event": can_create,
-                "draft_status": "ready" if can_create else "incomplete"
+                "draft_status": "ready" if can_create else "incomplete",
+                "critical_field_status": critical_status
             }
             
         except Exception as e:
@@ -157,23 +164,39 @@ class EventService:
         
         # Format price
         price_display = ""
-        if cost is not None and cost > 0:
-            price_display = f"${float(cost):.2f}"
-        elif event.get("is_free"):
-            price_display = "FREE"
+        try:
+            if cost is not None and float(cost) > 0:
+                price_display = f"${float(cost):.2f}"
+            elif event.get("is_free"):
+                price_display = "FREE"
+        except Exception:
+            price_display = str(cost) if cost is not None else ""
         
         # Generate highlights
         highlights = []
+        try:
+            min_age_val = int(min_age) if min_age not in (None, "") else None
+        except Exception:
+            min_age_val = None
+        try:
+            max_age_val = int(max_age) if max_age not in (None, "") else None
+        except Exception:
+            max_age_val = None
+        try:
+            max_participants_val = int(max_participants) if max_participants not in (None, "") else None
+        except Exception:
+            max_participants_val = None
+
         if venue_type and venue_type != "physical":
             highlights.append(f"🌐 {venue_type.title()}")
-        if min_age and max_age:
-            highlights.append(f"👶 Ages {min_age}-{max_age}")
-        elif min_age:
-            highlights.append(f"👶 Ages {min_age}+")
-        if max_participants:
-            highlights.append(f"👥 Max {max_participants}")
+        if min_age_val and max_age_val:
+            highlights.append(f"👶 Ages {min_age_val}-{max_age_val}")
+        elif min_age_val:
+            highlights.append(f"👶 Ages {min_age_val}+")
+        if max_participants_val:
+            highlights.append(f"👥 Max {max_participants_val}")
         if price_display:
-            highlights.append(f"💰 {price_display}")
+            highlights.append(f"�� {price_display}")
         
         # Event type badge
         event_type_display = event_type.replace("_", " ").title()
@@ -399,4 +422,126 @@ class EventService:
         return {
             "current_user": user,
             "csrf_token": generate_csrf_token()
-        } 
+        }
+    
+    def proof_event_description(self, draft: Dict[str, Any]) -> Dict[str, Any]:
+        """Proof and enhance the event description and key fields for preview."""
+        # Copy to avoid mutating input
+        draft = dict(draft)
+        description = draft.get("description", "")
+        title = draft.get("title", "Untitled Event")
+        date = draft.get("date", None)
+        location = draft.get("location", None)
+        cost = draft.get("cost", None)
+        min_age = draft.get("min_age", None)
+        max_age = draft.get("max_age", None)
+        max_pupils = draft.get("max_pupils", None)
+
+        # Build a list of missing details to add to the description
+        details = []
+        if date and str(date) not in description:
+            details.append(f"Date: {date}")
+        if location and location not in description:
+            details.append(f"Location: {location}")
+        if cost not in (None, "") and (str(cost) not in description and "$" not in description):
+            try:
+                cost_val = float(cost)
+                if cost_val > 0:
+                    details.append(f"Cost: ${cost_val:.2f}")
+                else:
+                    details.append("Cost: Free")
+            except Exception:
+                details.append(f"Cost: {cost}")
+        if min_age and (f"Ages {min_age}" not in description):
+            if max_age:
+                details.append(f"Ages: {min_age}-{max_age}")
+            else:
+                details.append(f"Ages: {min_age}+")
+        if max_pupils and (str(max_pupils) not in description):
+            details.append(f"Max participants: {max_pupils}")
+
+        # Add missing details to the description
+        if details:
+            if description:
+                description = description.strip()
+                if not description.endswith("."):
+                    description += "."
+                description += " " + " ".join(details)
+            else:
+                description = " ".join(details)
+        # Optionally, rephrase for clarity (simple version)
+        description = description.replace("..", ".")
+        draft["description"] = description.strip()
+        return draft 
+
+    def get_critical_field_status(self, current: dict, previous: dict = None) -> dict:
+        """Check which critical fields are present, missing, or newly added."""
+        # Determine event format/type
+        event_format = (current.get("event_format") or "").lower()
+        is_in_person = event_format == "in_person"
+        is_online = event_format == "online"
+        is_hybrid = event_format == "hybrid"
+
+        # Define required fields
+        required_fields = [
+            ("title", "Event Title"),
+            ("event_type", "Event Type"),
+            ("short_description", "Short Description"),
+            ("start_date", "Start Date & Time"),
+            ("event_format", "Event Format"),
+        ]
+        # Pricing: at least one of these must be present
+        pricing_fields = ["is_free", "cost", "ticket_price"]
+        # Location required for in-person/hybrid
+        if is_in_person or is_hybrid:
+            required_fields.append(("location", "Location"))
+        # Online meeting link required for online/hybrid
+        if is_online or is_hybrid:
+            required_fields.append(("online_meeting_link", "Online Meeting Link"))
+
+        # Check which are present
+        present = set()
+        for key, _ in required_fields:
+            val = current.get(key)
+            if val not in (None, ""):
+                present.add(key)
+        # Pricing logic
+        has_pricing = False
+        if current.get("is_free") or (current.get("cost") and float(current.get("cost") or 0) > 0):
+            has_pricing = True
+        elif current.get("ticket_price"):
+            try:
+                if float(current["ticket_price"]) > 0:
+                    has_pricing = True
+            except Exception:
+                pass
+        if has_pricing:
+            present.add("pricing")
+        else:
+            # Add a pseudo-field for missing pricing
+            required_fields.append(("pricing", "Pricing (Cost, Ticket, or Free)"))
+
+        # Determine missing fields
+        missing = [label for key, label in required_fields if key not in present]
+
+        # Determine added fields (if previous provided)
+        added = []
+        if previous:
+            for key, label in required_fields:
+                prev_val = previous.get(key) if previous else None
+                curr_val = current.get(key)
+                if (curr_val not in (None, "")) and (prev_val in (None, "")):
+                    added.append(label)
+            # Pricing
+            prev_pricing = previous.get("is_free") or (previous.get("cost") and float(previous.get("cost") or 0) > 0) or (previous.get("ticket_price") and float(previous["ticket_price"]) > 0)
+            curr_pricing = has_pricing
+            if curr_pricing and not prev_pricing:
+                added.append("Pricing (Cost, Ticket, or Free)")
+        else:
+            # If no previous, all present fields are 'added'
+            added = [label for key, label in required_fields if key in present]
+            if has_pricing:
+                added.append("Pricing (Cost, Ticket, or Free)")
+
+        all_present = len(missing) == 0
+        return {"added": added, "missing": missing, "all_present": all_present} 

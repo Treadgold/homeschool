@@ -14,24 +14,25 @@
 .container-fluid {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 1rem;
+    padding: 0.5rem;
 }
 
 .split-layout {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-    height: calc(100vh - 200px);
-    min-height: 600px;
+    gap: 1rem;
+    height: calc(100vh - 160px);
+    min-height: 500px;
 }
 
 .panel {
     background: white;
     border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    margin-bottom: 0.5rem;
 }
 
 .panel-header {
@@ -61,19 +62,18 @@
 
 .panel-body {
     flex: 1;
-    padding: 1rem;
-    overflow-y: auto;
+    padding: 0.5rem 0.75rem 0.5rem 0.75rem;
+    overflow: visible;
 }
 
 .chat-messages {
-    min-height: 300px;
-    max-height: 500px;
-    overflow-y: auto;
+    min-height: 220px;
+    overflow: visible;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
-    padding: 1rem;
+    padding: 0.5rem 0.75rem;
     background: #f8f9fa;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
 }
 
 .message {
@@ -92,9 +92,8 @@
 }
 
 .message-content {
-    max-width: 80%;
-    padding: 0.75rem 1rem;
-    border-radius: 18px;
+    max-width: 100%;
+    overflow: visible;
     white-space: pre-wrap;
     word-wrap: break-word;
 }
@@ -123,26 +122,33 @@
 }
 
 .chat-input {
-    display: flex;
-    gap: 0.5rem;
+    display: block;
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.25rem 0;
 }
 
-.chat-input input {
-    flex: 1;
-    padding: 0.75rem;
+.chat-input textarea.chat-textarea {
+    width: 100%;
+    min-height: 38px;
+    max-height: none;
+    padding: 0.65rem 1rem;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
     font-size: 1rem;
+    resize: none;
+    overflow: visible;
+    transition: box-shadow 0.2s;
+    box-sizing: border-box;
 }
 
 .chat-input button {
-    padding: 0.75rem 1rem;
-    background: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
+    padding: 0.7rem 1.1rem;
     font-size: 1rem;
+    border-radius: 8px;
+    margin-top: 0.5rem;
+    width: 100%;
+    display: block;
 }
 
 .chat-input button:hover {
@@ -470,6 +476,15 @@
                      hx-swap="innerHTML">
                     <div class="loading"></div> Initializing AI assistant...
                 </div>
+                <script>
+                // Auto-grow textarea
+                document.addEventListener('input', function(e) {
+                  if (e.target.classList.contains('chat-textarea')) {
+                    e.target.style.height = 'auto';
+                    e.target.style.height = (e.target.scrollHeight) + 'px';
+                  }
+                });
+                </script>
             </div>
         </div>
 

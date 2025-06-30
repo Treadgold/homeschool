@@ -255,32 +255,33 @@ async def ai_chat_init_htmx(
         
         # Return proper HTML instead of JSON
         return f"""
-        <div class="chat-container" id="chat-container">
-            <div class="chat-messages" id="chatMessages">
-                <div class="message assistant">
-                    <div class="message-avatar">🤖</div>
-                    <div class="message-content">{session_data.get('message', 'Hello! How can I help you create an event?')}</div>
+        <div class=\"chat-container\" id=\"chat-container\">
+            <div class=\"chat-messages\" id=\"chatMessages\">
+                <div class=\"message assistant\">
+                    <div class=\"message-avatar\">🤖</div>
+                    <div class=\"message-content\">{session_data.get('message', 'Hello! How can I help you create an event?')}</div>
                 </div>
             </div>
             
-            <div class="chat-input">
-                <form hx-post="/api/ai/chat/message" 
-                      hx-target="#chatMessages" 
-                      hx-swap="beforeend"
-                      hx-on::after-request="this.reset(); document.getElementById('messageInput').focus()">
-                    <input type="hidden" name="session_id" value="{session_data.get('session_id', '')}">
-                    <input type="text" 
-                           name="message" 
-                           id="messageInput"
-                           placeholder="Describe your event..." 
-                           required
-                           autocomplete="off">
-                    <button type="submit">Send</button>
+            <div class=\"chat-input\">
+                <form hx-post=\"/api/ai/chat/message\" 
+                      hx-target=\"#chatMessages\" 
+                      hx-swap=\"beforeend\"
+                      hx-on::after-request=\"this.reset(); document.getElementById('messageInput').focus()\">
+                    <input type=\"hidden\" name=\"session_id\" value=\"{session_data.get('session_id', '')}\">
+                    <textarea name=\"message\" 
+                              id=\"messageInput\"
+                              class=\"chat-textarea\"
+                              placeholder=\"Describe your event...\" 
+                              required
+                              autocomplete=\"off\"
+                              rows=\"1\"></textarea>
+                    <button type=\"submit\">Send</button>
                 </form>
             </div>
             
-            <div class="chat-status">
-                <small class="text-muted">
+            <div class=\"chat-status\">
+                <small class=\"text-muted\">
                     AI Model: {session_data.get('provider', 'Unknown')} - {session_data.get('model', 'Unknown')}
                 </small>
             </div>

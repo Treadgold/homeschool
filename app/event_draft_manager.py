@@ -9,6 +9,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+import re
 
 from app.models import Event, AgentSession, ChatConversation, ChatMessage
 from app.ai_tools import DynamicEventTools
@@ -28,6 +29,16 @@ class EventDraftManager:
     
     def __init__(self, db: Session):
         self.db = db
+    
+    def _make_json_safe(self, obj):
+        if isinstance(obj, dict):
+            return {k: self._make_json_safe(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._make_json_safe(i) for i in obj]
+        elif isinstance(obj, datetime):
+            return obj.isoformat()
+        else:
+            return obj
     
     def save_event_draft(
         self, 
@@ -61,8 +72,9 @@ class EventDraftManager:
                 agent_session.memory = {}
             
             # Create structured draft storage
+            safe_draft_data = self._make_json_safe(draft_data)
             draft_entry = {
-                "event_data": draft_data,
+                "event_data": safe_draft_data,
                 "source": source,
                 "timestamp": datetime.now().isoformat(),
                 "version": self._get_next_version(agent_session.memory)
@@ -376,13 +388,28 @@ class DynamicToolIntegration:
                         event_data,
                         source=f"ai_tool_{tool_name}"
                     )
-                    
-                    # Enhance tool result with draft information
                     tool_result["draft_saved"] = saved
                     tool_result["can_create_event"] = saved
-            
+
+                    # --- NEW LOGIC: Parse and add ticket types if mentioned in arguments ---
+                    ticket_types = []
+                    # Example: parse arguments['description'] or similar for ticket info
+                    desc = arguments.get('description') or arguments.get('notes') or ''
+                    # Look for patterns like 'Children are only $17, adult tickets will be $38'
+                    child_match = re.search(r'child(?:ren)?[^\d$]*(\$?\d+(?:\.\d{1,2})?)', desc, re.IGNORECASE)
+                    adult_match = re.search(r'adult[^\d$]*(\$?\d+(?:\.\d{1,2})?)', desc, re.IGNORECASE)
+                    if child_match:
+                        price = float(child_match.group(1).replace('$',''))
+                        ticket_types.append({"name": "Child", "price": price})
+                    if adult_match:
+                        price = float(adult_match.group(1).replace('$',''))
+                        ticket_types.append({"name": "Adult", "price": price})
+                    # Optionally, add more parsing for other ticket types
+                    # Add each ticket type using the tool
+                    for ticket in ticket_types:
+                        await self.tools.execute_tool("add_ticket_type", ticket)
+                    tool_result["ticket_types_added"] = ticket_types
             return tool_result
-            
         except Exception as e:
             logger.error(f"Tool integration failed: {e}")
             return {"error": f"Tool integration failed: {str(e)}"}
