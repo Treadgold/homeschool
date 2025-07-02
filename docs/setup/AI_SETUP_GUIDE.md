@@ -1,201 +1,324 @@
-# 🤖 AI Event Creation Setup Guide
+# 🤖 AI Event Creation Setup Guide - Langraph Edition
 
 ## Overview
 
-The AI Event Creation feature allows admin users to create events through natural conversation instead of filling out forms. It uses **GPT-4o-mini** with function calling to interact with your existing booking system.
+The AI Event Creation system uses **Langraph workflows** for reliable, production-ready event creation through natural conversation. It features explicit state management, guaranteed tool execution, and support for multiple AI providers (OpenAI, Anthropic, Ollama).
 
-## Quick Start
+## 🚀 Quick Start (3 Minutes)
 
-### 1. Get OpenAI API Key
-
-1. Sign up at [OpenAI Platform](https://platform.openai.com)
-2. Create an API key
-3. Add to your `.env` file:
-
+### 1. Clone and Start
 ```bash
-OPENAI_API_KEY=your_openai_api_key_here
+git clone https://github.com/yourusername/homeschool-platform.git
+cd homeschool-platform
+
+# Start 4-container architecture
+docker-compose up --build
+
+# Access AI system
+open http://localhost:8000/admin/ai-models  # Admin dashboard
+open http://localhost:8000/ai-create-event  # Event creation
 ```
 
-### 2. Install Dependencies
+### 2. Configure AI Provider (Choose One)
 
+#### Option A: OpenAI (Recommended for Production)
 ```bash
-pip install -r requirements.txt
+# Add to .env file
+OPENAI_API_KEY=sk-proj-your_openai_key_here
+CURRENT_AI_MODEL=openai_gpt4_turbo
 ```
 
-The `openai>=1.0.0` package is now included in requirements.txt.
+#### Option B: Anthropic Claude  
+```bash
+# Add to .env file
+ANTHROPIC_API_KEY=sk-ant-your_anthropic_key_here
+CURRENT_AI_MODEL=anthropic_claude
+```
 
-### 3. Test the AI Assistant
+#### Option C: Ollama (Free Local)
+```bash
+# Install Ollama on Windows host
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama pull llama3.1:8b
 
-1. Start your application: `uvicorn app.main:app --reload`
-2. Login as an admin user
-3. Click the "🤖 AI Create" button in the navigation
-4. Try saying: *"I want to create a science workshop for kids aged 8-12 next Saturday from 10am-2pm at the community center for $15"*
+# Models auto-detected at http://host.docker.internal:11434
+# Set in admin dashboard: /admin/ai-models
+```
 
-## How It Works
+### 3. Test Langraph Workflow
+1. **Go to**: http://localhost:8000/ai-create-event (admin required)
+2. **Say**: *"Create a coding workshop for teenagers next Saturday from 2-4pm at the community center, $15 per student, max 20 students"*
+3. **Watch** the Langraph workflow execute:
+   ```
+   ✅ Extract Details Node    - Parsing user input
+   ✅ Create Event Draft Node - Building event structure  
+   ✅ Check Tickets Node      - Analyzing ticket requirements
+   ✅ Add Ticket Types Node   - Creating pricing tiers
+   ✅ Generate Response Node  - Preparing user feedback
+   ```
+4. **Result**: Complete event with all details and ticket types created
 
-### 🛠️ Tool-Based Architecture
+## 🏗️ **Architecture Overview**
 
-Instead of training a model on your booking logic, the AI uses **function calling** to interact with your existing system:
+### **Current Implementation**
+```
+app/ai/ (Complete AI Subsystem)
+├── services/
+│   ├── langgraph_event_agent.py  ✅ Langraph workflow engine
+│   ├── chat_service.py           ✅ Conversation management
+│   ├── health_service.py         ✅ System monitoring
+│   └── migration_service.py      ✅ Database operations
+├── agents/                       ✅ Multi-agent support
+├── tools/                        ✅ 14+ specialized tools
+├── providers/                    ✅ Multi-provider management
+└── router.py                     ✅ 19 AI endpoints
+```
+
+### **Langraph Workflow Engine**
+The core AI system uses Langraph for explicit workflow control:
 
 ```python
-# The AI can call these functions:
-- create_event_draft()        # Create event preview
-- check_date_availability()   # Check for conflicts
-- get_similar_events()        # Find pricing references
-- calculate_suggested_pricing() # Suggest prices
-- get_venue_suggestions()     # Recommend venues
+# Workflow nodes (guaranteed execution)
+extract_details → create_event → check_tickets → add_ticket → generate_response
+                                      ↓               ↓
+                               (conditional)    (conditional)
 ```
 
-### 💰 Cost-Effective Model
+**Benefits**:
+- **Guaranteed Execution**: Tools always run when conditions are met
+- **State Persistence**: Workflow state survives interruptions
+- **Explicit Control**: No ambiguous AI behavior or failed tool calls
+- **Debugging**: Full visibility into workflow execution
 
-**GPT-4o-mini** is perfect for this use case:
-- **~90% cheaper** than GPT-4 ($0.15/1M tokens vs $5/1M)
-- **Excellent tool calling** capabilities
-- **Fast response times**
-- **Great for conversational interfaces**
+## 🛠️ **Advanced Configuration**
 
-### 🔄 Maintainable Design
+### **Multi-Provider Setup**
 
-When you update your booking features, you only need to:
-1. Update the tool definitions in `app/ai_tools.py`
-2. No model retraining required!
-3. Changes take effect immediately
-
-## Example Conversation
-
-```
-AI: Hi! I'm here to help you create your event. What kind of event are you planning?
-
-User: I want to run a coding workshop for teenagers
-
-AI: Great! A coding workshop sounds exciting. When would you like to hold this workshop?
-
-User: Next Friday from 2-5pm
-
-AI: Perfect! Next Friday from 2-5pm works well. Where would you like to hold the coding workshop?
-
-User: At the library meeting room
-
-AI: 📅 Next Friday looks perfect - no conflicts!
-💰 Similar events typically charge around $12.50
-Range: $10.00 - $15.00
-
-✅ Great! I've prepared your event draft.
-
-[Event Preview Shows]
-Title: Coding Workshop
-Date: 2024-01-19
-Location: Library meeting room
-Cost: $12.50
+#### OpenAI Configuration
+```bash
+# .env file
+OPENAI_API_KEY=sk-proj-...
+OPENAI_ORG_ID=org-...              # Optional
+OPENAI_PROJECT_ID=proj_...         # Optional
 ```
 
-## File Structure
+**Models Available**:
+- `gpt-4-turbo-preview` (Best for complex workflows)
+- `gpt-4o-mini` (Cost-effective, fast)
+- `gpt-3.5-turbo` (Budget option)
 
-```
-app/
-├── ai_assistant.py          # Main AI service using GPT-4o-mini
-├── ai_tools.py             # Function definitions for AI to call
-├── main.py                 # API endpoints added
-└── templates/
-    └── ai_create_event.html # Chat interface
-```
-
-## API Endpoints
-
-- `POST /api/ai/chat/start` - Start new conversation
-- `POST /api/ai/chat/{session_id}/message` - Send message
-- `POST /api/ai/chat/{session_id}/create-event` - Create event
-- `GET /ai-create-event` - Chat interface page
-
-## Customization
-
-### Adding New Tools
-
-1. Add function to `EventCreationTools` class in `ai_tools.py`
-2. Add to `get_tool_definitions()` method
-3. Add handler in `send_chat_message()` endpoint
-
-### Changing AI Behavior
-
-Edit the system prompt in `ai_assistant.py`:
-
-```python
-def get_system_prompt(self) -> str:
-    return """You are a helpful AI assistant for creating homeschool events...
-    
-    # Add your custom instructions here
-    """
+#### Anthropic Configuration  
+```bash
+# .env file
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-### Using Different Models
+**Models Available**:
+- `claude-3-sonnet-20240229` (Balanced performance)
+- `claude-3-haiku-20240307` (Fast, efficient)
+- `claude-3-opus-20240229` (Most capable)
 
-Change the model in `ai_assistant.py`:
+#### Ollama Configuration
+```bash
+# Windows host setup
+ollama pull llama3.1:8b      # 4GB RAM minimum
+ollama pull llama3.1:70b     # 64GB RAM minimum  
+ollama pull mistral:7b       # Alternative model
+ollama pull codellama:13b    # Code-focused model
 
-```python
-self.model = "gpt-4"  # or "gpt-3.5-turbo"
+# Models automatically appear in admin dashboard
 ```
 
-## Cost Estimation
+### **System Health Monitoring**
 
-### Monthly Usage Example:
-- **50 events created** via AI
-- **~10 messages per event** (500 total messages)
-- **~100 tokens per message** (50,000 total tokens)
+Access comprehensive health monitoring:
+- **URL**: http://localhost:8000/api/ai/health
+- **Admin UI**: http://localhost:8000/admin/ai-models
 
-**Cost: ~$7.50/month** with GPT-4o-mini
-
-Compare to form-based creation:
-- **Time saved**: 10-15 minutes per event
-- **User satisfaction**: Higher engagement
-- **Error reduction**: AI validates data
-
-## Troubleshooting
-
-### Common Issues:
-
-1. **"Authentication required" error**
-   - Make sure `OPENAI_API_KEY` is set in `.env`
-   - Restart the application after adding the key
-
-2. **"Invalid date format" error**
-   - The AI extracts dates automatically
-   - If issues persist, try more specific date formats
-
-3. **Tool execution fails**
-   - Check database connection
-   - Verify user permissions
-   - Check application logs
-
-### Testing Without OpenAI
-
-For development/testing without API costs, you can modify `ai_assistant.py` to return mock responses:
-
-```python
-# In ai_assistant.py, add this for testing:
-async def chat(self, user_message: str, ...):
-    # Mock response for testing
-    return {
-        "response": f"Mock response to: {user_message}",
-        "type": "text",
-        "needs_input": True
-    }
+**Health Checks Include**:
+```json
+{
+  "database": "healthy",
+  "ai_providers": {
+    "openai": "connected",
+    "anthropic": "connected", 
+    "ollama": "available"
+  },
+  "workflows": {
+    "langraph_agent": "operational",
+    "react_agent": "operational"
+  },
+  "tools": {
+    "total": 14,
+    "operational": 14,
+    "failed": 0
+  }
+}
 ```
 
-## Next Steps
+## 🧪 **Testing & Validation**
 
-1. **Try the basic functionality** - Create a few test events
-2. **Customize the prompts** - Adjust AI behavior for your needs
-3. **Add more tools** - Extend functionality as needed
-4. **Monitor usage** - Track costs and performance
-5. **Gather user feedback** - Improve based on admin user experience
+### **Automated Testing**
+```bash
+# Run comprehensive AI tests
+docker-compose --profile test up test
 
-## Future Enhancements
+# Test specific components
+docker-compose exec app python -m pytest tests/ai/ -v
 
-Consider adding:
-- 🎤 **Voice input** for mobile users
-- 📊 **Analytics** on AI conversation success rates
-- 🔄 **Event templates** based on successful patterns
-- 📧 **Email generation** for event confirmations
-- 🎨 **Image analysis** for venue photos
+# Test Langraph workflows specifically  
+docker-compose exec app python test_langraph_comparison.py
+```
 
-The AI assistant is designed to grow with your platform while maintaining cost-effectiveness and ease of maintenance! 
+### **Interactive Testing**
+The admin dashboard provides interactive testing:
+
+1. **Model Testing**: Test chat, function calling, and workflows
+2. **Workflow Visualization**: See Langraph execution in real-time
+3. **Performance Monitoring**: Track response times and success rates
+4. **Error Debugging**: View detailed error logs and recovery
+
+### **Manual Validation**
+Try these test cases in the AI interface:
+
+```
+Test Case 1: Simple Event
+"Create a book club meeting this Friday at 7pm"
+
+Test Case 2: Complex Event with Tickets
+"Create a science workshop for kids 8-12, next Saturday 10am-2pm, 
+$15 per child, max 20 students, at the community center"
+
+Test Case 3: Multi-Step Conversation
+User: "I want to create a workshop"
+AI: "What kind of workshop?"
+User: "Cooking class for teenagers"
+AI: "When would you like to schedule it?"
+User: "Next weekend, Saturday afternoon"
+```
+
+## 💰 **Cost Management**
+
+### **Model Cost Comparison**
+| Provider | Model | Cost/1M Tokens | Use Case |
+|----------|-------|----------------|----------|
+| OpenAI | GPT-4 Turbo | $10 | Complex workflows |
+| OpenAI | GPT-4o-mini | $0.15 | Cost-effective |
+| Anthropic | Claude 3 Sonnet | $3 | Balanced choice |
+| Ollama | Local Models | $0 | Free (hardware only) |
+
+### **Cost Optimization**
+```bash
+# Use cost-effective models for development
+CURRENT_AI_MODEL=openai_gpt4o_mini
+
+# Use local models for testing
+CURRENT_AI_MODEL=ollama_llama3_1_8b
+
+# Switch to premium for production
+CURRENT_AI_MODEL=openai_gpt4_turbo
+```
+
+## 🔧 **Troubleshooting**
+
+### **Common Issues**
+
+#### "No AI models available"
+```bash
+# Check configuration
+docker-compose exec app python -c "
+from app.ai_providers import AIProviderManager
+manager = AIProviderManager()
+print(manager.get_available_models())
+"
+```
+
+#### "Langraph workflow fails"
+```bash
+# Check Langraph agent status
+curl http://localhost:8000/api/ai/health | jq .workflows
+```
+
+#### "Ollama not connecting"
+```bash
+# Test Ollama connectivity from container
+docker-compose exec app curl http://host.docker.internal:11434/api/tags
+```
+
+### **Debug Mode**
+```bash
+# Enable detailed logging
+DEBUG=true docker-compose up
+
+# Run debug service
+docker-compose --profile debug up debug
+```
+
+### **Performance Issues**
+```bash
+# Monitor AI performance
+docker-compose exec app python scripts/monitor_ai_performance.py
+
+# Clear request queue
+curl -X POST http://localhost:8000/api/ai/clear-queue
+```
+
+## 📊 **Production Deployment**
+
+### **Environment Variables**
+```bash
+# Production .env
+DATABASE_URL=postgresql://user:secure_pass@prod_db:5432/homeschool
+REDIS_URL=redis://prod_redis:6379
+OPENAI_API_KEY=sk-proj-production_key
+CURRENT_AI_MODEL=openai_gpt4_turbo
+
+# Security
+SECRET_KEY=very_secure_random_key
+ALLOWED_HOSTS=your-domain.com,www.your-domain.com
+
+# Monitoring
+SENTRY_DSN=https://your-sentry-dsn
+LOG_LEVEL=INFO
+```
+
+### **Health Monitoring**
+Set up monitoring endpoints:
+- **Health Check**: `GET /api/ai/health`
+- **Metrics**: `GET /api/ai/metrics`
+- **Status Page**: `GET /admin/ai-models`
+
+### **Scaling Considerations**
+```yaml
+# docker-compose.prod.yml
+services:
+  app:
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.0"
+    environment:
+      - AI_MAX_CONCURRENT_REQUESTS=10
+      - AI_REQUEST_TIMEOUT=30
+```
+
+## 📚 **Additional Resources**
+
+- **[Langraph Documentation](https://langchain-ai.github.io/langgraph/)** - Official Langraph guides
+- **[Architecture Design](../architecture/AI_ARCHITECTURE_DESIGN.md)** - Technical architecture
+- **[Agent Implementation](../../AGENT_IMPLEMENTATION.md)** - Multi-agent system details
+- **[Development Guide](../guides/DEBUG_GUIDE.md)** - Local development setup
+
+## 🎯 **Next Steps**
+
+1. **✅ Complete Setup** - Get AI working with your preferred provider
+2. **✅ Test Workflows** - Verify Langraph execution in admin dashboard  
+3. **✅ Create Events** - Try the conversational event creation
+4. **🔄 Monitor Performance** - Use health dashboard to track AI system
+5. **🚀 Production Deploy** - Move to production environment with monitoring
+
+---
+
+**🎉 Your Langraph-powered AI event creation system is ready to transform how users create events!** 
