@@ -130,14 +130,61 @@ async def get_chat_status(
     """Get chat session status"""
     return await chat_service.get_chat_status(session_id, user, db)
 
-@ai_router.post("/chat/new")
+@ai_router.post("/chat/new", response_class=HTMLResponse)
 async def start_new_chat(
     request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(require_authenticated_user)
 ):
-    """Start a new chat session"""
-    return await chat_service.start_new_chat(user, db)
+    """Start a new chat session and return HTML for HTMX"""
+    try:
+        # Get the new session data
+        session_data = await chat_service.start_new_chat(user, db)
+        session_id = session_data.get('session_id', '')
+        
+        # Return proper HTML for the chat container with preview refresh trigger
+        return f"""
+        <div class="chat-container" id="chat-container">
+            <input type="hidden" name="session_id" value="{session_id}">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message assistant">
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-content">Welcome! How can I help you create an event today?</div>
+                </div>
+            </div>
+            
+            <div class="chat-input">
+                <form hx-post="/chat/message" 
+                      hx-target="#chatMessages" 
+                      hx-swap="beforeend"
+                      hx-on::after-request="this.reset(); document.getElementById('messageInput').focus()">
+                    <input type="hidden" name="session_id" value="{session_id}">
+                    <textarea name="message" 
+                             id="messageInput"
+                             class="chat-textarea"
+                             placeholder="Describe your event..."
+                             required></textarea>
+                    <button type="submit" class="btn btn-primary">Send</button>
+                </form>
+            </div>
+            
+            <!-- Trigger preview refresh for new session -->
+            <div hx-get="/event-preview?session_id={session_id}"
+                 hx-target="#event-preview"
+                 hx-trigger="load"
+                 hx-swap="innerHTML"
+                 style="display: none;">
+            </div>
+        </div>
+        """
+    except Exception as e:
+        logger.error(f"Failed to start new chat: {e}")
+        return f"""
+        <div class="alert alert-danger">
+            <strong>❌ Error:</strong> Failed to start new chat session. Please try refreshing the page.
+            <br><small>Error: {str(e)}</small>
+        </div>
+        """
 
 
 # ===== HEALTH ENDPOINTS =====
@@ -192,6 +239,32 @@ async def ai_health_status_htmx(
 async def get_available_ai_models(user: User = Depends(require_authenticated_user)):
     """Get list of available AI models (API endpoint)"""
     return model_service.get_available_models_api(user)
+
+
+@ai_router.get("/models/current")
+async def get_current_model_info(user: User = Depends(require_authenticated_user)):
+    """Get information about the currently active AI model"""
+    try:
+        from app.ai_assistant import ai_manager
+        current_model = ai_manager.current_config
+        model_config = ai_manager.get_current_model_config()
+        
+        return {
+            "current_model": current_model,
+            "provider": model_config.provider if model_config else "unknown",
+            "model_name": model_config.model_name if model_config else "unknown",
+            "max_tokens": model_config.max_tokens if model_config else 1000,
+            "temperature": model_config.temperature if model_config else 0.7
+        }
+    except Exception as e:
+        logger.error(f"Failed to get current model info: {e}")
+        return {
+            "current_model": "unknown",
+            "provider": "unknown", 
+            "model_name": "unknown",
+            "max_tokens": 1000,
+            "temperature": 0.7
+        }
 
 @ai_router.post("/clear-queue")
 async def clear_ai_request_queue(
@@ -254,49 +327,39 @@ async def ai_chat_init_htmx(
         session_data = await chat_service.initialize_chat_session(user, db)
         
         # Return proper HTML instead of JSON
+        session_id = session_data.get('session_id', '')
         return f"""
-        <div class=\"chat-container\" id=\"chat-container\">
-            <div class=\"chat-messages\" id=\"chatMessages\">
-                <div class=\"message assistant\">
-                    <div class=\"message-avatar\">🤖</div>
-                    <div class=\"message-content\">{session_data.get('message', 'Hello! How can I help you create an event?')}</div>
+        <div class="chat-container" id="chat-container">
+            <input type="hidden" name="session_id" value="{session_id}">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message assistant">
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-content">{session_data.get('conversation_history', [{'content': 'Hello! How can I help you create an event?'}])[0]['content']}</div>
                 </div>
             </div>
             
-            <div class=\"chat-input\">
-                <form hx-post=\"/api/ai/chat/message\" 
-                      hx-target=\"#chatMessages\" 
-                      hx-swap=\"beforeend\"
-                      hx-on::after-request=\"this.reset(); document.getElementById('messageInput').focus()\">
-                    <input type=\"hidden\" name=\"session_id\" value=\"{session_data.get('session_id', '')}\">
-                    <textarea name=\"message\" 
-                              id=\"messageInput\"
-                              class=\"chat-textarea\"
-                              placeholder=\"Describe your event...\" 
-                              required
-                              autocomplete=\"off\"
-                              rows=\"1\"></textarea>
-                    <button type=\"submit\">Send</button>
+            <div class="chat-input">
+                <form hx-post="/chat/message" 
+                      hx-target="#chatMessages" 
+                      hx-swap="beforeend"
+                      hx-on::after-request="this.reset(); document.getElementById('messageInput').focus()">
+                    <input type="hidden" name="session_id" value="{session_id}">
+                    <textarea name="message" 
+                             id="messageInput"
+                             class="chat-textarea"
+                             placeholder="Describe your event..."
+                             required></textarea>
+                    <button type="submit" class="btn btn-primary">Send</button>
                 </form>
-            </div>
-            
-            <div class=\"chat-status\">
-                <small class=\"text-muted\">
-                    AI Model: {session_data.get('provider', 'Unknown')} - {session_data.get('model', 'Unknown')}
-                </small>
             </div>
         </div>
         """
-        
     except Exception as e:
         logger.error(f"Failed to initialize chat: {e}")
         return f"""
-        <div class="alert alert-error">
-            <h4>❌ Failed to Initialize AI</h4>
-            <p>Error: {str(e)}</p>
-            <button class="btn btn-primary" hx-get="/api/ai/chat/init" hx-target="#chat-container">
-                🔄 Retry
-            </button>
+        <div class="alert alert-danger">
+            <strong>❌ Error:</strong> Failed to initialize chat session. Please try refreshing the page.
+            <br><small>Error: {str(e)}</small>
         </div>
         """
 
@@ -323,7 +386,7 @@ async def ai_chat_message_htmx(
         """
         
         # Process the message through the chat service
-        result = await chat_service.process_chat_message(session_id, message, user, db)
+        result = await chat_service.send_chat_message(session_id, message, user, db)
         
         # Get the AI response and format as HTML
         ai_response = result.get('ai_response', 'I apologize, but I encountered an error processing your message.')
@@ -340,7 +403,7 @@ async def ai_chat_message_htmx(
         event_preview_html = ""
         if result.get('event_preview') or result.get('tool_calls_made'):
             event_preview_html = f"""
-            <div hx-get="/api/ai/event-preview?session_id={session_id}"
+            <div hx-get="/event-preview?session_id={session_id}"
                  hx-target="#event-preview" 
                  hx-swap="innerHTML"
                  hx-trigger="load"></div>
@@ -353,7 +416,7 @@ async def ai_chat_message_htmx(
         if result.get('tool_calls_made') or result.get('event_data_extracted'):
             response_html += """
             <div hx-trigger="load" 
-                 hx-get="/api/ai/event-preview" 
+                 hx-get="/event-preview" 
                  hx-vals='{"session_id": "%s"}'
                  hx-target="#event-preview" 
                  hx-swap="innerHTML"></div>
@@ -374,20 +437,54 @@ async def ai_chat_message_htmx(
 @ai_router.get("/event-preview", response_class=HTMLResponse)  
 async def ai_event_preview_get_htmx(
     request: Request,
-    session_id: str = Query(...),
+    session_id: Optional[str] = Query(None),
     user: User = Depends(require_authenticated_user),
     db: Session = Depends(get_db)
 ):
     """
     HTMX GET endpoint for event preview from AI conversation
     """
-    return await event_service.get_event_preview_html(session_id, user, db)
+    try:
+        # If session_id is provided, use it; otherwise find active conversation
+        if session_id:
+            target_session_id = session_id
+        else:
+            # Find the user's ACTIVE chat conversation (not just most recent)
+            from app.models import ChatConversation
+            active_conversation = db.query(ChatConversation)\
+                .filter(ChatConversation.user_id == user.id)\
+                .filter(ChatConversation.status == "active")\
+                .order_by(ChatConversation.updated_at.desc())\
+                .first()
+            
+            if not active_conversation:
+                return """
+                <div class="empty-state">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📅</div>
+                    <h4>No Event Data Yet</h4>
+                    <p>Start describing your event in the chat, and watch it appear here!</p>
+                </div>
+                """
+            
+            target_session_id = str(active_conversation.id)
+        
+        logger.debug(f"Event preview for user {user.id}, session_id: {target_session_id}")
+        
+        return await event_service.get_event_preview_html(target_session_id, user, db)
+        
+    except Exception as e:
+        logger.error(f"Error getting event preview: {e}")
+        return f"""
+            <div class="alert alert-error">
+                <strong>Preview Error:</strong> {str(e)}
+            </div>
+        """
 
 
 @ai_router.post("/event-preview", response_class=HTMLResponse)
 async def ai_event_preview_htmx(
     request: Request,
-    session_id: str = Form(...),
+    session_id: Optional[str] = Form(None),
     user: User = Depends(require_authenticated_user),
     db: Session = Depends(get_db)
 ):
@@ -395,6 +492,15 @@ async def ai_event_preview_htmx(
     HTMX endpoint for event preview from AI conversation
     Extracted from main.py ai_event_preview_htmx()
     """
+    if not session_id:
+        return """
+        <div class="empty-state">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">📅</div>
+            <h4>No Event Data Yet</h4>
+            <p>Start describing your event in the chat, and watch it appear here!</p>
+        </div>
+        """
+        
     return await event_service.get_event_preview_html(session_id, user, db)
 
 
@@ -407,7 +513,6 @@ async def ai_event_preview_htmx(
 
 # These endpoints exist in main.py but will be implemented in later phases
 placeholder_endpoints = [
-    "/event-preview",
     "/models/available", 
     "/models/refresh-ollama",
     "/clear-queue",
@@ -420,4 +525,99 @@ for endpoint in placeholder_endpoints:
         return {
             "message": f"Endpoint {endpoint} will be implemented in a future phase",
             "status": "placeholder"
-        } 
+        }
+
+@ai_router.get("/test-ticket-tools", response_class=HTMLResponse)
+async def test_ticket_tools(
+    user: User = Depends(require_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Admin test endpoint to verify ticket tools work without cost averaging"""
+    try:
+        from app.ai.langchain_tools import create_event_draft, add_ticket_type
+        from app.event_draft_manager import EventDraftManager
+        
+        # Find user's most recent conversation
+        from app.models import ChatConversation
+        recent_conversation = db.query(ChatConversation)\
+            .filter(ChatConversation.user_id == user.id)\
+            .order_by(ChatConversation.created_at.desc())\
+            .first()
+        
+        if not recent_conversation:
+            return "<div class='alert alert-error'>No conversation found</div>"
+        
+        session_id = str(recent_conversation.id)
+        
+        # Test 1: Create event (should NOT create cost field)
+        result1 = create_event_draft.invoke({
+            'session_id': session_id,
+            'title': 'Test Cooking Class',
+            'date': '2024-08-25T15:00:00', 
+            'description': 'Admin test for ticket tools'
+        })
+        
+        # Test 2: Add multiple tickets with different prices
+        result2 = add_ticket_type.invoke({
+            'session_id': session_id,
+            'name': 'Child Ticket',
+            'price': 20.0,
+            'description': 'Ages 8-16'
+        })
+        
+        result3 = add_ticket_type.invoke({
+            'session_id': session_id,
+            'name': 'Adult Ticket',
+            'price': 35.0,
+            'description': 'Ages 17+'
+        })
+        
+        # Test 3: Check final draft
+        draft_manager = EventDraftManager(db)
+        final_draft = draft_manager.get_current_draft(session_id)
+        
+        # Generate results HTML
+        has_cost_field = 'cost' in final_draft if final_draft else False
+        ticket_count = len(final_draft.get('tickets', [])) if final_draft else 0
+        
+        status_class = "alert-error" if has_cost_field else "alert-success"
+        status_icon = "❌" if has_cost_field else "✅"
+        
+        ticket_details = ""
+        if final_draft and final_draft.get('tickets'):
+            for i, ticket in enumerate(final_draft['tickets']):
+                name = ticket.get('name', 'Unknown')
+                price = ticket.get('price', 0)
+                desc = ticket.get('description', '')
+                ticket_details += f"<li><strong>{name}</strong>: ${price} - {desc}</li>"
+        
+        return f"""
+        <div class="alert {status_class}">
+            <h4>{status_icon} Ticket Tools Test Results</h4>
+            <p><strong>Cost field averaging:</strong> {'FAILED - Cost field still present!' if has_cost_field else 'SUCCESS - Cost field removed!'}</p>
+            <p><strong>Individual tickets:</strong> {ticket_count} tickets created</p>
+            <p><strong>Session ID:</strong> {session_id}</p>
+            
+            {f'<p><strong>⚠️ Problem:</strong> Cost field = ${final_draft["cost"]}</p>' if has_cost_field else ''}
+            
+            <h5>📝 Tool Results:</h5>
+            <ul>
+                <li>Event creation: {len(result1)} characters</li>
+                <li>Child ticket: {len(result2)} characters</li>  
+                <li>Adult ticket: {len(result3)} characters</li>
+            </ul>
+            
+            <h5>🎫 Tickets Created:</h5>
+            <ul>{ticket_details}</ul>
+            
+            <button onclick="location.reload()" class="btn btn-primary">🔄 Run Test Again</button>
+        </div>
+        """
+        
+    except Exception as e:
+        return f"""
+        <div class="alert alert-error">
+            <h4>❌ Test Failed</h4>
+            <p>Error: {str(e)}</p>
+        </div>
+        """ 

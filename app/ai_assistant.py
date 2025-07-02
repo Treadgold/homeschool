@@ -520,21 +520,7 @@ Don't just say "I understand you want to create an event" - actually CREATE the 
                 info['max_pupils'] = int(match.group(1))
                 break
         
-        # Enhanced cost extraction
-        cost_patterns = [
-            r'(?:children|kids|child)\s+(?:are\s+)?\$?(\d+)',
-            r'(?:adults?)\s+(?:are\s+)?\$?(\d+)',
-            r'\$(\d+)(?:\s+(?:per\s+)?(?:person|adult|child))?'
-        ]
-        
-        costs = []
-        for pattern in cost_patterns:
-            matches = re.findall(pattern, user_message)
-            costs.extend([int(match) for match in matches])
-        
-        if costs:
-            # Use average cost or most common cost
-            info['cost'] = sum(costs) / len(costs)
+        # Note: Cost extraction removed - we now use individual tickets instead of averaging prices
         
         # Set defaults for missing information
         if not info.get('title') and any(word in message_lower for word in ['zoo', 'visit']):

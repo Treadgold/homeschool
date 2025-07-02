@@ -110,7 +110,7 @@ def mock_ai_provider():
         provider="mock",
         model_name="test-model",
         endpoint_url="http://localhost:11434",
-        max_tokens=1000,
+        max_tokens=3000,
         temperature=0.7
     )
     return MockAIProvider(config)

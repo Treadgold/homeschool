@@ -29,7 +29,7 @@ class TestOllamaFunctionCalling:
             provider="ollama",
             model_name="devstral:latest",
             endpoint_url="http://host.docker.internal:11434",
-            max_tokens=1000,
+            max_tokens=3000,
             temperature=0.7
         )
 

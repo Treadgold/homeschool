@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+If you try to test, remember that the container is one of 4, db, app, redis, mailhog. You are working in an environment is wsl inside windows. If you try to access the app, remember to   exec into the correct container first. This is important for testing.

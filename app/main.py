@@ -108,11 +108,12 @@ Base.metadata.create_all(bind=engine)
 # Serve static files (for uploaded images)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
-SESSION_COOKIE = "session"
-SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
-serializer = URLSafeTimedSerializer(SECRET_KEY)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Import auth utilities to avoid circular dependencies
+from app.utils.auth_utils import (
+    get_password_hash, verify_password, create_session_cookie, get_current_user,
+    create_email_token, verify_email_token, generate_csrf_token, verify_csrf_token,
+    require_admin, SESSION_COOKIE, SESSION_MAX_AGE, serializer
+)
 
 # Simple in-memory session store for OAuth flows
 oauth_sessions: Dict[str, int] = {}
@@ -122,48 +123,6 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", 1025))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
 SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def create_session_cookie(user_id, max_age=SESSION_MAX_AGE):
-    return serializer.dumps({"user_id": user_id})
-
-def get_current_user(request: Request, db: Session = Depends(get_db), session: str = Cookie(None)):
-    if not session:
-        return None
-    try:
-        data = serializer.loads(session, max_age=SESSION_MAX_AGE)
-        user = db.query(User).filter(User.id == data["user_id"]).first()
-        return user
-    except (BadSignature, SignatureExpired):
-        return None
-
-def create_email_token(email: str) -> str:
-    return serializer.dumps({"email": email}, salt="email-confirm")
-
-def verify_email_token(token: str) -> str:
-    try:
-        data = serializer.loads(token, salt="email-confirm", max_age=86400)  # 24 hours
-        return data["email"]
-    except:
-        return None
-
-# CSRF token generation and validation
-def generate_csrf_token() -> str:
-    """Generate a CSRF token for forms"""
-    return serializer.dumps({"csrf": "token"}, salt="csrf")
-
-def verify_csrf_token(token: str) -> bool:
-    """Verify a CSRF token"""
-    try:
-        serializer.loads(token, salt="csrf", max_age=3600)  # 1 hour expiry
-        return True
-    except:
-        return False
 
 @app.get("/", response_class=HTMLResponse)
 async def landing(request: Request):
@@ -737,10 +696,7 @@ async def auth_complete(request: Request, session_id: str = Query(...)):
     print(f"Set final session cookie for user {user_id}: {session_token[:20]}...")
     return response
 
-def require_admin(user=Depends(get_current_user)):
-    if not user or not user.is_admin:
-        raise HTTPException(status_code=403, detail="Admins only")
-    return user
+
 
 @app.get("/admin/events/new", response_class=HTMLResponse)
 async def create_event_form(request: Request, user: User = Depends(require_admin)):
@@ -1162,7 +1118,6 @@ def create_test_users():
                 try:
                     user = db.query(User).filter(User.email == u["email"]).first()
                     if not user:
-                        from app.main import get_password_hash
                         # Create user with auth_provider for newer schema, fallback for older schema
                         try:
                             user = User(
@@ -3373,4 +3328,6 @@ async def deny_adult_booking_cancellation(
     
     return RedirectResponse(url="/admin/cancellation-requests", status_code=HTTP_303_SEE_OTHER)
 
-
+# Include AI router
+from app.ai.router import ai_router
+app.include_router(ai_router)

@@ -311,14 +311,14 @@ class TestModelConfiguration:
             provider="ollama",
             model_name="devstral:latest", 
             endpoint_url="http://localhost:11434",
-            max_tokens=1000,
+            max_tokens=3000,
             temperature=0.7
         )
         
         assert config.provider == "ollama"
         assert config.model_name == "devstral:latest"
         assert config.endpoint_url == "http://localhost:11434"
-        assert config.max_tokens == 1000
+        assert config.max_tokens == 3000
         assert config.temperature == 0.7
     
     def test_model_config_defaults(self):

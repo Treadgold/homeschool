@@ -3,12 +3,10 @@ AI Chat Service
 
 This service handles all AI chat conversation functionality, including:
 - Starting new chat sessions
-- Processing chat messages
-- Managing conversation history
-- Event creation from chat
-- HTMX chat interface support
+- Processing chat messages with a LangChain agent
+- Finalizing event creation from drafts
 
-Extracted from main.py as part of Phase 2 AI architecture refactoring.
+Refactored to use LangChain agent as the primary processor.
 """
 
 import logging
@@ -23,7 +21,13 @@ from sqlalchemy.orm import Session
 from app.models import (
     User, ChatConversation, ChatMessage, AgentSession, AgentStatus
 )
+# Import the Qwen3-optimized agent service
+from .qwen3_optimized_agent import invoke_agent
+# Import the new LangGraph agent service
+from .langgraph_event_agent import invoke_langgraph_event_agent
 
+# Configuration for which agent to use
+AGENT_TYPE = "langgraph"  # Options: "qwen3_optimized", "langgraph"
 
 class ChatService:
     """Service for managing AI chat conversations"""
@@ -31,61 +35,67 @@ class ChatService:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
     
-    async def start_chat_session(self, user: User, db: Session) -> Dict[str, Any]:
+    async def initialize_chat_session(self, user: User, db: Session) -> Dict[str, Any]:
         """
-        Start a new AI chat conversation.
-        This version correctly handles session and agent creation.
+        Finds or creates a chat conversation for a user.
+        This is now a simple session initializer.
         """
         if not user:
-            raise HTTPException(status_code=401, detail="Authentication required to start a chat.")
+            raise HTTPException(status_code=401, detail="Authentication required.")
 
-        try:
-            from app.ai_agent import EventCreationAgent
-            from app.ai_assistant import ai_manager # This is for getting model info
-            
-            # This part is simplified, assuming one conversation per user for now.
-            # A more robust implementation would handle multiple conversations.
-            conversation = db.query(ChatConversation).filter(ChatConversation.user_id == user.id).first()
+        conversation = db.query(ChatConversation).filter(
+            ChatConversation.user_id == user.id, 
+            ChatConversation.status != "archived"
+        ).first()
 
-            if not conversation:
-                conversation = ChatConversation(user_id=user.id)
-                db.add(conversation)
+        # Ensure agent session exists for existing conversations
+        if conversation:
+            agent_session = db.query(AgentSession).filter_by(conversation_id=conversation.id).first()
+            if not agent_session:
+                agent_session = AgentSession(
+                    id=str(uuid.uuid4()),
+                    conversation_id=conversation.id,
+                    agent_type="event_creator",
+                    status=AgentStatus.waiting,
+                    memory={}
+                )
+                db.add(agent_session)
                 db.commit()
-                db.refresh(conversation)
 
-            # Get model info for display
-            try:
-                current_model_key = ai_manager.get_current_model_key()
-                current_config = ai_manager.get_current_model_config()
-                provider = current_config.provider if current_config else "unknown"
-                model = current_config.model_name if current_config else "unknown"
-            except Exception:
-                provider = "fallback"
-                model = "not_available"
-
-            agent = EventCreationAgent(db=db, user_id=user.id)
-            initial_message = "Welcome! How can I help you create an event today?"
+        if not conversation:
+            conversation = ChatConversation(user_id=user.id, id=str(uuid.uuid4()))
+            db.add(conversation)
             
-            # Check if conversation has messages to determine if it's new
-            if conversation.messages:
-                 initial_message = "Welcome back! How can I continue helping you with your event?"
-
-            return {
-                "session_id": conversation.id,
-                "user_id": conversation.user_id,
-                "message": initial_message,
-                "provider": provider,
-                "model": model,
-                "agent_status": "idle",
-                "conversation_history": [msg.to_dict() for msg in conversation.messages[-10:]]
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Failed to start AI chat session: {e}\n{traceback.format_exc()}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to initialize AI chat session."
+            # Create agent session for draft storage
+            agent_session = AgentSession(
+                id=str(uuid.uuid4()),
+                conversation_id=conversation.id,
+                agent_type="event_creator",
+                status=AgentStatus.waiting,
+                memory={}
             )
+            db.add(agent_session)
+            
+            # Add an initial welcome message
+            initial_message = ChatMessage(
+                conversation_id=conversation.id,
+                role='assistant',
+                content="Welcome! How can I help you create an event today?"
+            )
+            db.add(initial_message)
+            db.commit()
+            db.refresh(conversation)
+        
+        from app.ai_assistant import ai_manager
+        current_config = ai_manager.get_current_model_config()
+
+        return {
+            "session_id": conversation.id,
+            "user_id": conversation.user_id,
+            "provider": current_config.provider if current_config else "Ollama",
+            "model": current_config.model_name if current_config else "default",
+            "conversation_history": [msg.to_dict() for msg in conversation.messages[-20:]]
+        }
     
     async def send_chat_message(
         self, 
@@ -94,7 +104,7 @@ class ChatService:
         user: User, 
         db: Session
     ) -> Dict[str, Any]:
-        """Send a message to the AI agent with real-time status updates"""
+        """Send a message to the AI agent using the new LangChain service."""
         if not user:
             raise HTTPException(status_code=401, detail="Authentication required")
         
@@ -102,38 +112,60 @@ class ChatService:
             raise HTTPException(status_code=400, detail="Message cannot be empty")
         
         try:
-            # Create agent instance
-            from app.ai_agent import EventCreationAgent
+            # Get the current model from the ai_manager
             from app.ai_assistant import ai_manager
+            current_config = ai_manager.get_current_model_config()
+            model_name = current_config.model_name if current_config else "llama3" # Fallback
+
+            # Choose agent based on configuration
+            if AGENT_TYPE == "langgraph":
+                agent_response = await invoke_langgraph_event_agent(
+                    session_id=session_id,
+                    user_prompt=message,
+                    model=model_name
+                )
+            else:  # Default to qwen3_optimized
+                agent_response = await invoke_agent(
+                    session_id=session_id,
+                    user_prompt=message,
+                    model=model_name
+                )
+
+            # Save user message
+            user_message = ChatMessage(conversation_id=session_id, role='user', content=message)
+            db.add(user_message)
+
+            # The new agent handles its own state, so we don't need to manually manage it here.
+            # We just need to format the response for the frontend.
+            ai_response_text = agent_response.get("output", "I'm sorry, I encountered a problem.")
             
-            agent = EventCreationAgent(db, user.id)
+            # Save AI response
+            ai_message = ChatMessage(conversation_id=session_id, role='assistant', content=ai_response_text)
+            db.add(ai_message)
             
-            # Get AI agent response
-            ai_response = await agent.continue_conversation(session_id, message)
-            
-            # Get model info for display
-            try:
-                current_config = ai_manager.get_current_model_config()
-                provider = current_config.provider if current_config else "unknown"
-                model = current_config.model_name if current_config else "unknown"
-            except:
-                provider = "unknown"
-                model = "unknown"
+            db.commit()
+
+            # Check if tools were used to trigger event preview update
+            tools_used = agent_response.get("intermediate_steps", [])
+            tool_calls_made = len(tools_used) > 0
             
             return {
                 "session_id": session_id,
                 "user_message": message,
-                "ai_response": ai_response["response"],
-                "agent_status": ai_response.get("agent_status", "waiting"),
-                "thought_chain": ai_response.get("thought_chain", []),
-                "tools_used": ai_response.get("tools_used", []),
-                "needs_input": ai_response.get("needs_input", True),
+                "ai_response": ai_response_text,
+                "agent_status": "waiting", # The new agent is synchronous, so it's always waiting after a response.
+                "thought_chain": [], # LangChain agent handles thoughts internally. We can expose them if needed later.
+                "tools_used": tools_used, # Expose tool usage
+                "tool_calls_made": tool_calls_made, # Flag for HTMX to update preview
+                "event_data_extracted": tool_calls_made, # Also set this flag for compatibility
+                "needs_input": True,
                 "type": "text",
-                "provider": provider,
-                "model": model
+                "provider": current_config.provider if current_config else "Ollama",
+                "model": model_name
             }
             
         except Exception as e:
+            self.logger.error(f"LangChain agent failed to process chat message: {e}\n{traceback.format_exc()}")
             # Get model info even in error case
             try:
                 from app.ai_assistant import ai_manager
@@ -147,7 +179,7 @@ class ChatService:
             return {
                 "session_id": session_id,
                 "user_message": message,
-                "ai_response": "Sorry, I encountered an error. Could you try rephrasing that?",
+                "ai_response": f"I'm sorry, I encountered an error: {str(e)}",
                 "error": str(e),
                 "agent_status": "error",
                 "needs_input": True,
@@ -209,278 +241,49 @@ class ChatService:
             }
     
     async def start_new_chat(self, user: User, db: Session) -> Dict[str, Any]:
-        """Start a brand new conversation (archive current active one)"""
+        """Archives the current conversation and starts a new one."""
         if not user:
             raise HTTPException(status_code=401, detail="Authentication required")
         
-        # Archive any active conversations
-        from app.ai_agent import ConversationManager
-        from app.ai_assistant import ai_manager
+        # Archive any active conversations for the user
+        active_conversations = db.query(ChatConversation).filter(
+            ChatConversation.user_id == user.id,
+            ChatConversation.status != "archived"
+        ).all()
+        for conv in active_conversations:
+            conv.status = "archived"
+            
+        # Archive corresponding agent sessions
+        for conv in active_conversations:
+            agent_session = db.query(AgentSession).filter_by(conversation_id=conv.id).first()
+            if agent_session:
+                agent_session.status = AgentStatus.idle
         
-        conv_manager = ConversationManager(db)
-        active_conv_id = conv_manager.get_or_create_active_conversation(user.id)
-        if active_conv_id:
-            conv_manager.archive_conversation(active_conv_id)
+        # Create a new session
+        new_conversation = ChatConversation(id=str(uuid.uuid4()), user_id=user.id)
+        db.add(new_conversation)
         
-        # Create new conversation
-        from app.ai_agent import EventCreationAgent
-        agent = EventCreationAgent(db, user.id)
-        result = await agent.start_conversation()
-        
-        # Get model info
-        try:
-            current_config = ai_manager.get_current_model_config()
-            provider = current_config.provider if current_config else "unknown"
-            model = current_config.model_name if current_config else "unknown"
-        except:
-            provider = "unknown"
-            model = "unknown"
-        
-        return {
-            "session_id": result["conversation_id"],
-            "message": result["message"],
-            "status": result["status"],
-            "agent_status": result["agent_status"],
-            "provider": provider,
-            "model": model
-        }
-    
-    async def get_chat_status(
-        self, 
-        session_id: str, 
-        user: User, 
-        db: Session
-    ) -> Dict[str, Any]:
-        """Get current agent status for real-time updates"""
-        if not user:
-            raise HTTPException(status_code=401, detail="Authentication required")
-        
-        try:
-            from app.ai_agent import EventCreationAgent
-            agent = EventCreationAgent(db, user.id)
-            conversation_data = agent.get_conversation_history(session_id)
-            
-            if not conversation_data:
-                raise HTTPException(status_code=404, detail="Conversation not found")
-            
-            return {
-                "agent_status": conversation_data["agent_state"]["status"] if conversation_data["agent_state"] else "idle",
-                "current_step": conversation_data["agent_state"]["current_step"] if conversation_data["agent_state"] else None
-            }
-        except RuntimeError as e:
-            if "migration" in str(e).lower():
-                raise HTTPException(status_code=503, detail="Database migration required")
-            raise HTTPException(status_code=500, detail=str(e))
-    
-    async def initialize_chat_session(self, user: User, db: Session) -> Dict[str, Any]:
-        """Start a new AI chat session for HTMX interface"""
-        try:
-            # Create new session
-            session_id = str(uuid.uuid4())
-            
-            # Initialize AI provider
-            from app.ai_assistant import ai_manager
-            ai_provider = ai_manager.get_current_provider()
-            
-            # Create conversation first
-            conversation = ChatConversation(
-                id=session_id,
-                user_id=user.id,
-                title="AI Event Creator",
-                status="active"
-            )
-            db.add(conversation)
-            db.commit()
-            
-            # Create agent session record
-            agent_session_id = str(uuid.uuid4())
-            session = AgentSession(
-                id=agent_session_id,
-                conversation_id=session_id,
-                agent_type="event_creator",
-                status=AgentStatus.idle
-            )
-            db.add(session)
-            db.commit()
-            
-            # Generate initial message
-            initial_message = """👋 Hello! I'm your AI Event Assistant. I'll help you create amazing events for your homeschool community.
+        # Create corresponding agent session (CRITICAL FIX)
+        agent_session = AgentSession(
+            id=new_conversation.id,  # Use same ID as conversation
+            conversation_id=new_conversation.id,
+            agent_type="event_creator",
+            status=AgentStatus.waiting,
+            memory={}
+        )
+        db.add(agent_session)
 
-Just describe your event naturally, like:
-• "Science workshop for kids 8-12 next Saturday 10am-2pm at the community center, $15 per child"
-• "Free nature walk for families this Sunday morning at the botanical gardens"
-
-What event would you like to create?"""
-            
-            # Save initial message
-            message = ChatMessage(
-                conversation_id=conversation.id,
-                role='assistant',
-                content=initial_message,
-                created_at=datetime.utcnow()
-            )
-            db.add(message)
-            db.commit()
-            
-            return {
-                "session_id": session_id,
-                "message": initial_message,
-                "provider": ai_provider.__class__.__name__,
-                "model": getattr(ai_provider, 'model_name', 'unknown')
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Failed to start AI chat session: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to start chat session: {str(e)}")
-    
-    async def process_chat_message(
-        self, 
-        session_id: str, 
-        message: str, 
-        user: User, 
-        db: Session
-    ) -> Dict[str, Any]:
-        """Process a chat message and return AI response for HTMX interface"""
-        try:
-            from app.ai_assistant import ai_manager
-            
-            # Get conversation
-            conversation = db.query(ChatConversation).filter(
-                ChatConversation.id == session_id
-            ).first()
-            
-            if not conversation:
-                raise HTTPException(status_code=404, detail="Conversation not found")
-            
-            # Get agent session
-            agent_session = db.query(AgentSession).filter(
-                AgentSession.conversation_id == session_id
-            ).first()
-            
-            # Save user message
-            user_message = ChatMessage(
-                conversation_id=conversation.id,
-                role='user',
-                content=message
-            )
-            db.add(user_message)
-            db.commit()
-            
-            # Get AI provider
-            ai_provider = ai_manager.get_current_provider()
-            
-            # Get conversation history
-            messages = db.query(ChatMessage).filter(
-                ChatMessage.conversation_id == conversation.id
-            ).order_by(ChatMessage.created_at).all()
-            
-            # Build conversation context
-            conversation_history = []
-            for msg in messages:
-                conversation_history.append({
-                    "role": msg.role,
-                    "content": msg.content
-                })
-            
-            # Process with AI provider
-            try:
-                # Use the EventCreationAssistant from ai_assistant.py
-                from app.ai_assistant import EventCreationAssistant
-                assistant = EventCreationAssistant()
-                
-                self.logger.info(f"Processing message with EventCreationAssistant: {message[:50]}...")
-                
-                ai_response = await assistant.chat(
-                    user_message=message,
-                    conversation_history=conversation_history[:-1],  # Exclude the current message we just added
-                    user_id=user.id,
-                    db=db,
-                    session_id=session_id  # Pass session_id for dynamic integration
-                )
-                
-                self.logger.info(f"AI response received: type={ai_response.get('type')}, has_response={bool(ai_response.get('response'))}, has_tool_results={bool(ai_response.get('tool_results'))}")
-                
-                # Extract info if available - Use correct key structure
-                extracted_info = None
-                if ai_response.get("type") == "tool_result" and ai_response.get("tool_results"):
-                    # Look for event creation tools in the results
-                    for tool_result in ai_response["tool_results"]:
-                        # Use "function" key instead of "tool"
-                        if tool_result.get("function") == "create_event_draft":
-                            extracted_info = tool_result.get("result", {})
-                            self.logger.info(f"Extracted event info: {extracted_info}")
-                            break
-                elif ai_response.get("event_preview"):
-                    # Alternative extraction path
-                    extracted_info = ai_response.get("event_preview")
-                    self.logger.info(f"Extracted event preview: {extracted_info}")
-                
-                # Get the response text with better fallback handling
-                response_text = ai_response.get("response", "").strip()
-                
-                # Better handling of empty responses
-                if not response_text:
-                    self.logger.warning("AI returned empty response, using fallback")
-                    response_text = f"I understand you mentioned: '{message}'. Let me help you create an event. Could you tell me more about what type of event you'd like to organize?"
-                
-                # Reformat for consistency with existing code
-                ai_response = {
-                    "response": response_text,
-                    "extracted_info": extracted_info
-                }
-                
-                self.logger.info(f"Final response prepared: {len(response_text)} chars, has_extracted_info={bool(extracted_info)}")
-                
-            except Exception as e:
-                self.logger.error(f"AI processing failed: {e}", exc_info=True)
-                # Fallback to a basic response that acknowledges the user's input
-                ai_response = {
-                    "response": f"I understand you mentioned: '{message}'. Let me help you create an event. Could you tell me more about what type of event you'd like to organize?",
-                    "extracted_info": None
-                }
-            
-            # Save AI response
-            assistant_message = ChatMessage(
-                conversation_id=conversation.id,
-                role='assistant',
-                content=ai_response.get('response', 'I apologize, but I encountered an error processing your message.')
-            )
-            db.add(assistant_message)
-            
-            # Update agent session with extracted info
-            if agent_session and ai_response.get('extracted_info'):
-                # Merge with existing memory
-                current_memory = agent_session.memory or {}
-                current_memory.update(ai_response['extracted_info'])
-                agent_session.memory = current_memory
-                self.logger.info(f"Updated agent memory with extracted info")
-            
-            db.commit()
-            
-            # Return the response with tracking info
-            return {
-                "ai_response": ai_response.get('response', 'I apologize, but I encountered an error processing your message.'),
-                "extracted_info": ai_response.get('extracted_info'),
-                "event_preview": ai_response.get('extracted_info') is not None,
-                "tool_calls_made": bool(ai_response.get('tool_calls')),
-                "event_data_extracted": bool(ai_response.get('extracted_info')),
-                "provider": ai_provider.__class__.__name__,
-                "model": getattr(ai_provider, 'model_name', 'unknown'),
-                "agent_status": "completed"
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Failed to process chat message: {e}", exc_info=True)
-            return {
-                "ai_response": f"❌ Sorry, I encountered an error: {str(e)}",
-                "extracted_info": None,
-                "event_preview": None,
-                "tool_calls_made": False,
-                "event_data_extracted": False,
-                "provider": "error",
-                "model": "error",
-                "agent_status": "error"
-            }
+        # Add an initial welcome message
+        initial_message = ChatMessage(
+            conversation_id=new_conversation.id,
+            role='assistant',
+            content="Welcome! How can I help you create an event today?"
+        )
+        db.add(initial_message)
+        db.commit()
+        db.refresh(new_conversation)
+        
+        return {"session_id": new_conversation.id}
     
     async def get_event_preview(
         self, 
@@ -488,27 +291,29 @@ What event would you like to create?"""
         user: User, 
         db: Session
     ) -> Dict[str, Any]:
-        """Get event preview data for HTMX interface"""
+        """Get event preview data for HTMX interface - Updated to use EventDraftManager"""
         try:
-            # Get the latest event data from the session
-            session = db.query(AgentSession).filter(
-                AgentSession.conversation_id == session_id
-            ).first()
+            # Use the EventDraftManager to get current draft (same as the tools use)
+            from app.event_draft_manager import EventDraftManager
             
-            if not session or not session.memory:
+            draft_manager = EventDraftManager(db)
+            current_draft = draft_manager.get_current_draft(session_id)
+            
+            if not current_draft:
+                self.logger.info(f"No event draft found for session {session_id}")
                 return {
                     "has_data": False,
                     "message": "No event data available yet"
                 }
             
-            event_data = session.memory
+            self.logger.info(f"Found event draft for session {session_id}: {list(current_draft.keys())}")
             
             # Return structured event data
             return {
                 "has_data": True,
-                "event_data": event_data,
-                "fields": self._format_event_fields(event_data),
-                "can_create": self._can_create_event(event_data)
+                "event_data": current_draft,
+                "fields": self._format_event_fields(current_draft),
+                "can_create": self._can_create_event(current_draft)
             }
             
         except Exception as e:

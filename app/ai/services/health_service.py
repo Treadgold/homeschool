@@ -66,40 +66,35 @@ class HealthService:
             }
             health_status["overall_status"] = "unhealthy"
         
-        # AI Provider Health Check
+        # AI Provider Health Check (Refactored for LangChain)
         try:
             from app.ai_assistant import ai_manager
-            provider = ai_manager.get_current_provider()
-            if provider:
+            current_config = ai_manager.get_current_model_config()
+            
+            if current_config and current_config.endpoint_url:
                 provider_info = {
                     "status": "healthy",
-                    "provider": provider.__class__.__name__,
-                    "model": ai_manager.get_current_model_key()
+                    "provider": current_config.provider,
+                    "model": current_config.model_name,
+                    "endpoint": current_config.endpoint_url
                 }
-                
-                # Add queue monitoring for Ollama
-                if hasattr(provider, '_request_queue') and provider._request_queue:
-                    queue_size = provider._request_queue.qsize()
-                    provider_info["queue_size"] = queue_size
-                    provider_info["current_model"] = getattr(provider, '_current_model', None)
-                    provider_info["model_loaded"] = getattr(provider, '_model_loaded', False)
-                    
-                    # Warn if queue is backing up
-                    if queue_size > 5:
-                        provider_info["status"] = "degraded"
-                        provider_info["warning"] = f"Request queue backing up: {queue_size} requests"
-                        if health_status["overall_status"] == "healthy":
-                            health_status["overall_status"] = "degraded"
-                
-                health_status["checks"]["ai_provider"] = provider_info
+            elif os.getenv("OLLAMA_ENDPOINT"):
+                 provider_info = {
+                    "status": "healthy",
+                    "provider": "Ollama",
+                    "model": "Default (not specified in config)",
+                    "endpoint": os.getenv("OLLAMA_ENDPOINT")
+                }
             else:
-                health_status["checks"]["ai_provider"] = {
+                provider_info = {
                     "status": "unavailable",
-                    "message": "No AI provider configured"
+                    "message": "No AI provider endpoint configured (OLLAMA_ENDPOINT is not set)."
                 }
                 if health_status["overall_status"] == "healthy":
                     health_status["overall_status"] = "degraded"
-                
+
+            health_status["checks"]["ai_provider"] = provider_info
+            
         except Exception as e:
             health_status["checks"]["ai_provider"] = {
                 "status": "error",
@@ -151,7 +146,7 @@ class HealthService:
                 <p>The AI agent system requires database updates to function properly.</p>
                 <p><strong>Missing tables:</strong> {', '.join(missing_tables)}</p>
                 <button class="btn btn-primary" 
-                        hx-post="/api/ai/migrate"
+                        hx-post="/migrate"
                         hx-target="#health-status"
                         hx-swap="innerHTML">
                     🔧 Run Migration Now
@@ -266,7 +261,7 @@ class HealthService:
                 <h4>❌ Migration Failed</h4>
                 <p>Error: {error_msg}</p>
                 <button class="btn btn-primary" 
-                        hx-post="/api/ai/migrate"
+                        hx-post="/migrate"
                         hx-target="#health-status"
                         hx-swap="innerHTML">
                     🔄 Retry Migration

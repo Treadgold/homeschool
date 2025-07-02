@@ -22,7 +22,7 @@ class ModelConfig:
     model_name: str
     endpoint_url: str
     api_key: Optional[str] = None
-    max_tokens: int = 1000  # Increased for larger models
+    max_tokens: int = 3000  # Increased for larger models
     temperature: float = 0.7
     enabled: bool = True
 
@@ -140,7 +140,7 @@ class OllamaProvider(BaseAIProvider):
                     "num_ctx": 8192,  # Increased from 4096 for larger models
                     
                     # Keep response length reasonable but not overly restrictive
-                    "num_predict": min(2000, current_payload["options"].get("num_predict", 1000)),
+                    "num_predict": min(3000, current_payload["options"].get("num_predict", 1000)),
                 })
                 
                 # Make the actual request using /api/generate (auto-loads models)
@@ -1130,7 +1130,7 @@ class AIProviderManager:
                 provider="mock",
                 model_name="test-assistant",
                 endpoint_url="local://mock",
-                max_tokens=500,
+                max_tokens=3000,
                 temperature=0.7,
                 enabled=True
             ),
@@ -1140,7 +1140,7 @@ class AIProviderManager:
                 model_name="gpt-4o-mini",
                 endpoint_url="https://api.openai.com/v1",
                 api_key=os.getenv("OPENAI_API_KEY"),
-                max_tokens=500,
+                max_tokens=3000,
                 temperature=0.7,
                 enabled=bool(os.getenv("OPENAI_API_KEY"))
             ),
@@ -1149,7 +1149,7 @@ class AIProviderManager:
                 model_name="gpt-4",
                 endpoint_url="https://api.openai.com/v1",
                 api_key=os.getenv("OPENAI_API_KEY"),
-                max_tokens=500,
+                max_tokens=3000,
                 temperature=0.7,
                 enabled=bool(os.getenv("OPENAI_API_KEY"))
             ),
@@ -1158,7 +1158,7 @@ class AIProviderManager:
                 model_name="claude-3-sonnet-20240229",
                 endpoint_url="https://api.anthropic.com",
                 api_key=os.getenv("ANTHROPIC_API_KEY"),
-                max_tokens=500,
+                max_tokens=3000,
                 temperature=0.7,
                 enabled=bool(os.getenv("ANTHROPIC_API_KEY"))
             )
@@ -1313,7 +1313,7 @@ class AIProviderManager:
                             provider="ollama",
                             model_name=model_name,
                             endpoint_url=self.ollama_endpoint,
-                            max_tokens=500,
+                            max_tokens=3000,
                             temperature=temperature,
                             enabled=True
                         )

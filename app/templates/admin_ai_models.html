@@ -655,6 +655,31 @@ async function testDynamicConnection() {
         testButton.disabled = false;
     }
 }
+
+async function fetchLogs() {
+    try {
+        const response = await fetch('/admin/ai-models/logs', {
+            method: 'GET',
+            credentials: 'same-origin'
+        });
+        const logs = await response.json();
+        const logDiv = document.getElementById('log-output');
+        logDiv.innerHTML = logs.map(log => `<div>${log}</div>`).join('');
+    } catch (error) {
+        console.error('Error fetching logs:', error);
+    }
+}
+
+// Update progress and fetch logs
+function updateProgress() {
+    fetchLogs();
+    // ... existing progress update logic ...
+}
+
+// Add a div for log output
+const logOutputDiv = document.createElement('div');
+logOutputDiv.id = 'log-output';
+document.body.appendChild(logOutputDiv);
 </script>
 
 <!-- Bootstrap JS for accordion functionality -->

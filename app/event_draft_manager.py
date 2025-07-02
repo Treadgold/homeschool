@@ -9,9 +9,11 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from decimal import Decimal
 import re
+from sqlalchemy.orm.attributes import flag_modified
 
-from app.models import Event, AgentSession, ChatConversation, ChatMessage
+from app.models import Event, TicketType, TicketStatus, AgentSession, ChatConversation, ChatMessage
 from app.ai_tools import DynamicEventTools
 
 logger = logging.getLogger(__name__)
@@ -89,6 +91,9 @@ class EventDraftManager:
             
             agent_session.memory["draft_history"].append(draft_entry)
             
+            # CRITICAL: Tell SQLAlchemy that the JSON field was modified
+            flag_modified(agent_session, 'memory')
+            
             # Update agent session
             agent_session.updated_at = datetime.now()
             self.db.commit()
@@ -121,7 +126,15 @@ class EventDraftManager:
             
             current_draft = agent_session.memory.get("current_event_draft")
             if current_draft:
-                return current_draft.get("event_data")
+                # Return the complete event_data including tickets
+                event_data = current_draft.get("event_data", {})
+                
+                # If tickets were stored separately at the root level, merge them in
+                root_tickets = current_draft.get("tickets")
+                if root_tickets and "tickets" not in event_data:
+                    event_data["tickets"] = root_tickets
+                    
+                return event_data
             
             return None
             
@@ -205,16 +218,22 @@ class EventDraftManager:
             self.db.commit()
             self.db.refresh(new_event)
             
+            # Create ticket types if they exist in the draft
+            tickets_created = 0
+            if "tickets" in draft_data and draft_data["tickets"]:
+                tickets_created = self._create_tickets_from_draft(new_event.id, draft_data["tickets"])
+            
             # Mark draft as used
             self._mark_draft_as_used(session_id, new_event.id)
             
-            logger.info(f"Successfully created event {new_event.id} from draft in session {session_id}")
+            logger.info(f"Successfully created event {new_event.id} with {tickets_created} ticket types from draft in session {session_id}")
             
             return {
                 "success": True,
                 "event_id": new_event.id,
                 "event": new_event,
-                "message": f"Event '{new_event.title}' created successfully!"
+                "tickets_created": tickets_created,
+                "message": f"Event '{new_event.title}' created successfully with {tickets_created} ticket type(s)!"
             }
             
         except Exception as e:
@@ -333,6 +352,56 @@ class EventDraftManager:
             event_data["max_pupils"] = 20
         
         return event_data
+    
+    def _create_tickets_from_draft(self, event_id: int, tickets_data: List[Dict[str, Any]]) -> int:
+        """
+        Create TicketType records from draft ticket data.
+        
+        Args:
+            event_id: ID of the event to create tickets for
+            tickets_data: List of ticket data from the draft
+        
+        Returns:
+            Number of tickets created
+        """
+        try:
+            tickets_created = 0
+            
+            for ticket_data in tickets_data:
+                try:
+                    # Create TicketType record
+                    ticket = TicketType(
+                        event_id=event_id,
+                        name=ticket_data.get("name", "Ticket"),
+                        description=ticket_data.get("description"),
+                        price=Decimal(str(ticket_data.get("price", 0))),
+                        quantity_available=ticket_data.get("quantity_available"),
+                        max_per_order=ticket_data.get("max_per_order"),
+                        min_per_order=ticket_data.get("min_per_order", 1),
+                        currency="NZD",
+                        status=TicketStatus.active
+                    )
+                    
+                    self.db.add(ticket)
+                    tickets_created += 1
+                    
+                    logger.info(f"Created ticket '{ticket.name}' for event {event_id}")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to create ticket from draft data {ticket_data}: {e}")
+                    continue
+            
+            # Commit all ticket creations
+            if tickets_created > 0:
+                self.db.commit()
+                logger.info(f"Successfully created {tickets_created} tickets for event {event_id}")
+            
+            return tickets_created
+            
+        except Exception as e:
+            logger.error(f"Failed to create tickets from draft: {e}")
+            self.db.rollback()
+            return 0
     
     def _mark_draft_as_used(self, session_id: str, event_id: int):
         """Mark the current draft as used to create an event."""

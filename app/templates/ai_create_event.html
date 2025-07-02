@@ -420,6 +420,61 @@
     100% { transform: rotate(360deg); }
 }
 
+/* AI Status Indicator Styles */
+.model-name {
+    font-size: 0.75rem;
+    background: rgba(255,255,255,0.15);
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    margin-left: 0.5rem;
+    font-weight: 400;
+    opacity: 0.9;
+}
+
+.ai-status {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 8px;
+    margin-left: 0.3rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+}
+
+.ai-status.ready {
+    background: rgba(34, 197, 94, 0.8);
+    color: white;
+}
+
+.ai-status.thinking {
+    background: rgba(251, 191, 36, 0.8);
+    color: white;
+    animation: pulse 1.5s infinite;
+}
+
+.ai-status.answering {
+    background: rgba(59, 130, 246, 0.8);
+    color: white;
+    animation: pulse 1.5s infinite;
+}
+
+.ai-status.using-tools {
+    background: rgba(168, 85, 247, 0.8);
+    color: white;
+    animation: pulse 1.5s infinite;
+}
+
+.ai-status.error {
+    background: rgba(239, 68, 68, 0.8);
+    color: white;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
 .htmx-request .loading {
     display: inline-block;
 }
@@ -447,7 +502,7 @@
 <div class="container-fluid">
     <!-- Health Check Alert -->
     <div id="health-status" 
-         hx-get="/api/ai/health-status" 
+         hx-get="/health-status" 
          hx-trigger="load, every 30s"
          hx-swap="innerHTML">
         <!-- Health status will load here -->
@@ -458,11 +513,14 @@
         <div class="panel">
             <div class="panel-header">
                 <div>
-                    <h3 class="panel-title">🤖 AI Event Assistant</h3>
+                    <h3 class="panel-title">🤖 AI Event Assistant 
+                        <span id="ai-model-name" class="model-name">Loading...</span>
+                        <span id="ai-status" class="ai-status">Ready</span>
+                    </h3>
                     <p class="panel-subtitle">Describe your event in natural language</p>
                 </div>
                 <button class="btn btn-outline" 
-                        hx-post="/api/ai/chat/new"
+                        hx-post="/chat/new"
                         hx-target="#chat-container"
                         hx-swap="outerHTML">
                     📝 New Chat
@@ -471,12 +529,124 @@
             
             <div class="panel-body">
                 <div id="chat-container" 
-                     hx-get="/api/ai/chat/init" 
+                     hx-get="/chat/init" 
                      hx-trigger="load"
                      hx-swap="innerHTML">
                     <div class="loading"></div> Initializing AI assistant...
                 </div>
                 <script>
+                // AI Status Management
+                class AIStatusManager {
+                    constructor() {
+                        this.statusElement = document.getElementById('ai-status');
+                        this.modelNameElement = document.getElementById('ai-model-name');
+                        this.loadModelInfo();
+                        this.setupEventListeners();
+                    }
+                    
+                    async loadModelInfo() {
+                        try {
+                            const response = await fetch('/models/current');
+                            const data = await response.json();
+                            if (data.current_model) {
+                                const modelDisplayName = data.current_model
+                                    .replace('ollama_', '')
+                                    .replace('_', ' ')
+                                    .replace(/(\d+)(b|B)/, '$1B') // Format model sizes like 14B
+                                    .split(' ')
+                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                    .join(' ');
+                                this.modelNameElement.textContent = modelDisplayName;
+                            }
+                        } catch (error) {
+                            console.warn('Failed to load model info:', error);
+                            this.modelNameElement.textContent = 'Model Unknown';
+                        }
+                    }
+                    
+                    setStatus(status) {
+                        if (!this.statusElement) return;
+                        
+                        // Remove all status classes
+                        this.statusElement.className = 'ai-status';
+                        
+                        // Add new status class and text
+                        switch(status) {
+                            case 'thinking':
+                                this.statusElement.classList.add('thinking');
+                                this.statusElement.textContent = 'Thinking...';
+                                break;
+                            case 'answering':
+                                this.statusElement.classList.add('answering');
+                                this.statusElement.textContent = 'Answering...';
+                                break;
+                            case 'using-tools':
+                                this.statusElement.classList.add('using-tools');
+                                this.statusElement.textContent = 'Using Tools...';
+                                break;
+                            case 'error':
+                                this.statusElement.classList.add('error');
+                                this.statusElement.textContent = 'Error';
+                                break;
+                            case 'ready':
+                            default:
+                                this.statusElement.classList.add('ready');
+                                this.statusElement.textContent = 'Ready';
+                                break;
+                        }
+                    }
+                    
+                    setupEventListeners() {
+                        // Listen for HTMX events to update status
+                        document.body.addEventListener('htmx:beforeRequest', (event) => {
+                            if (event.detail.elt.matches('form[hx-post*="/chat/message"]')) {
+                                this.setStatus('thinking');
+                            }
+                        });
+                        
+                        document.body.addEventListener('htmx:responseError', () => {
+                            this.setStatus('error');
+                            setTimeout(() => this.setStatus('ready'), 3000);
+                        });
+                        
+                        document.body.addEventListener('htmx:afterRequest', (event) => {
+                            if (event.detail.elt.matches('form[hx-post*="/chat/message"]')) {
+                                // Check if AI response mentions tool usage or event creation
+                                const response = event.detail.xhr.responseText;
+                                if (response.includes('draft') || response.includes('created') || 
+                                    response.includes('successfully') || response.includes('Event draft') ||
+                                    response.includes('hx-get="/event-preview"') ||
+                                    response.includes('ticket') || response.includes('Ticket')) {
+                                    this.setStatus('using-tools');
+                                    // Only refresh event preview after a delay, and only if user isn't on tickets tab
+                                    const eventPreview = document.getElementById('event-preview');
+                                    const ticketsTab = eventPreview?.querySelector('.tab-button[data-tab="tickets"]');
+                                    const isTicketsActive = ticketsTab?.classList.contains('active');
+                                    
+                                    if (eventPreview && !isTicketsActive) {
+                                        // Delay the refresh to avoid interrupting user interactions
+                                        setTimeout(() => {
+                                            const stillNotOnTickets = !ticketsTab?.classList.contains('active');
+                                            if (stillNotOnTickets) {
+                                                htmx.trigger(eventPreview, 'refresh-preview');
+                                            }
+                                        }, 1000);
+                                    }
+                                    setTimeout(() => this.setStatus('ready'), 2500);
+                                } else {
+                                    this.setStatus('answering');
+                                    setTimeout(() => this.setStatus('ready'), 1500);
+                                }
+                            }
+                        });
+                    }
+                }
+                
+                // Initialize status manager when page loads
+                document.addEventListener('DOMContentLoaded', () => {
+                    window.aiStatus = new AIStatusManager();
+                });
+                
                 // Auto-grow textarea
                 document.addEventListener('input', function(e) {
                   if (e.target.classList.contains('chat-textarea')) {
@@ -499,9 +669,8 @@
             
             <div class="panel-body">
                 <div id="event-preview"
-                     hx-get="/api/ai/event-preview"
-                     hx-trigger="load, messageProcessed from:body"
-                     hx-include="[name='session_id']"
+                     hx-get="/event-preview"
+                     hx-trigger="load, refresh-preview"
                      hx-swap="innerHTML">
                     <div class="empty-state">
                         <div style="font-size: 3rem; margin-bottom: 1rem;">📅</div>

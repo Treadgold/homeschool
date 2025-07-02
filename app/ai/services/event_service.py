@@ -43,11 +43,14 @@ class EventService:
             current_draft = draft_manager.get_current_draft(session_id)
             
             if not current_draft:
+                self.logger.info(f"No current draft found for session {session_id}")
                 return {
                     "success": True,
                     "message": "No event draft created yet. Start describing your event to see it appear here!",
                     "empty_state": True
                 }
+            
+            self.logger.info(f"Found draft for session {session_id}: {list(current_draft.keys())}")
             
             # Proof and enhance the draft before preview
             current_draft = self.proof_event_description(current_draft)
@@ -73,7 +76,8 @@ class EventService:
                     "min_age": current_draft.get("min_age", ""),
                     "max_age": current_draft.get("max_age", ""),
                     "cost": current_draft.get("cost", ""),
-                    "image_url": current_draft.get("image_url", "")
+                    "image_url": current_draft.get("image_url", ""),
+                    "tickets": current_draft.get("tickets", [])  # Include tickets in preview!
                 },
                 "event_fields": event_fields,
                 "can_create_event": can_create,
@@ -143,7 +147,6 @@ class EventService:
         date_str = event.get("date", "")
         location = event.get("location") or event.get("venue_name", "")
         event_type = event.get("event_type", "homeschool")
-        cost = event.get("cost")
         max_participants = event.get("max_pupils") or event.get("max_participants")
         min_age = event.get("min_age")
         max_age = event.get("max_age")
@@ -161,16 +164,6 @@ class EventService:
                     formatted_date = date_str.strftime("%A, %B %d, %Y at %I:%M %p")
             except:
                 formatted_date = str(date_str)
-        
-        # Format price
-        price_display = ""
-        try:
-            if cost is not None and float(cost) > 0:
-                price_display = f"${float(cost):.2f}"
-            elif event.get("is_free"):
-                price_display = "FREE"
-        except Exception:
-            price_display = str(cost) if cost is not None else ""
         
         # Generate highlights
         highlights = []
@@ -195,11 +188,12 @@ class EventService:
             highlights.append(f"👶 Ages {min_age_val}+")
         if max_participants_val:
             highlights.append(f"👥 Max {max_participants_val}")
-        if price_display:
-            highlights.append(f"�� {price_display}")
         
         # Event type badge
         event_type_display = event_type.replace("_", " ").title()
+        
+        # Get tickets if they exist
+        tickets = event.get("tickets", []) or event.get("ticket_types", [])
         
         return f"""
         <div class="event-preview-card">
@@ -220,19 +214,127 @@ class EventService:
             <!-- Event Highlights -->
             {f'<div class="event-highlights">{"".join([f"<span class=\"event-highlight\">{highlight}</span>" for highlight in highlights])}</div>' if highlights else ''}
             
-            <!-- Event Description -->
-            {f'<div class="event-description">{description}</div>' if description else ''}
-            
-            <!-- Event Details Grid -->
-            <div class="event-details-grid">
-                {self._generate_details_grid(fields)}
+            <!-- Tabbed Content -->
+            <div class="preview-tabs">
+                <div class="tab-buttons">
+                    <button class="tab-button active" onclick="showTab(event, 'details')">📋 Event Details</button>
+                    <button class="tab-button" onclick="showTab(event, 'tickets')">🎫 Tickets ({len(tickets)})</button>
+                </div>
+                
+                <!-- Event Details Tab -->
+                <div id="details" class="tab-content active">
+                    {f'<div class="event-description"><strong>Description:</strong><br>{description}</div>' if description else ''}
+                    
+                    <div class="event-details-grid">
+                        {self._generate_details_grid(fields)}
+                    </div>
+                </div>
+                
+                <!-- Tickets Tab -->
+                <div id="tickets" class="tab-content">
+                    {self._generate_tickets_display(tickets)}
+                </div>
             </div>
             
             <!-- Action Buttons -->
             <div class="event-actions">
-                {self._generate_action_buttons(can_create, session_id)}
+                {self._generate_action_buttons(can_create, session_id, event)}
             </div>
         </div>
+        
+        <style>
+        .preview-tabs {{
+            margin: 1rem 0;
+        }}
+        
+        .tab-buttons {{
+            display: flex;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 1rem;
+        }}
+        
+        .tab-button {{
+            background: none;
+            border: none;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+            transition: all 0.2s;
+        }}
+        
+        .tab-button.active {{
+            border-bottom-color: var(--primary-color);
+            color: var(--primary-color);
+        }}
+        
+        .tab-button:hover {{
+            background: #f8f9fa;
+        }}
+        
+        .tab-content {{
+            display: none;
+        }}
+        
+        .tab-content.active {{
+            display: block;
+        }}
+        
+        .ticket-card {{
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: #f8f9fa;
+        }}
+        
+        .ticket-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }}
+        
+        .ticket-name {{
+            font-weight: 600;
+            color: var(--primary-color);
+        }}
+        
+        .ticket-price {{
+            font-weight: bold;
+            color: #28a745;
+        }}
+        
+        .ticket-details {{
+            font-size: 0.9rem;
+            color: #6c757d;
+        }}
+        
+        .no-tickets {{
+            text-align: center;
+            color: #6c757d;
+            padding: 2rem;
+            font-style: italic;
+        }}
+        </style>
+        
+        <script>
+        function showTab(event, tabName) {{
+            // Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+            
+            // Remove active class from all buttons
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(button => button.classList.remove('active'));
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked button
+            event.target.classList.add('active');
+        }}
+        </script>
         """
     
     def _generate_details_grid(self, fields: List[Dict]) -> str:
@@ -248,7 +350,6 @@ class EventService:
             "Max Students": "👥",
             "Min Age": "👶",
             "Max Age": "👴",
-            "Cost": "💰",
             "Image URL": "🖼️",
             "Venue Type": "🏢",
             "Event Format": "🎯",
@@ -272,12 +373,70 @@ class EventService:
         
         return "".join(detail_items)
     
-    def _generate_action_buttons(self, can_create: bool, session_id: str) -> str:
+    def _generate_tickets_display(self, tickets: List[Dict]) -> str:
+        """Generate tickets display for the tickets tab"""
+        if not tickets:
+            return """
+            <div class="no-tickets">
+                <div style="font-size: 2rem; margin-bottom: 1rem;">🎫</div>
+                <h4>No Tickets Defined Yet</h4>
+                <p>Ask the AI to add ticket types to your event!</p>
+                <p><em>For example: "Add a child ticket for $15 and an adult ticket for $25"</em></p>
+            </div>
+            """
+        
+        ticket_cards = []
+        for i, ticket in enumerate(tickets):
+            # Extract ticket information
+            name = ticket.get("name", f"Ticket {i+1}")
+            description = ticket.get("description", "")
+            price = ticket.get("price", 0)
+            max_quantity = ticket.get("max_quantity") or ticket.get("limit")
+            min_age = ticket.get("min_age")
+            max_age = ticket.get("max_age")
+            
+            # Format price
+            price_display = "FREE"
+            try:
+                if price and float(price) > 0:
+                    price_display = f"${float(price):.2f}"
+            except:
+                price_display = str(price) if price else "FREE"
+            
+            # Build ticket details
+            details = []
+            if description:
+                details.append(f"📝 {description}")
+            if min_age or max_age:
+                if min_age and max_age:
+                    details.append(f"👶 Ages {min_age}-{max_age}")
+                elif min_age:
+                    details.append(f"👶 Ages {min_age}+")
+                elif max_age:
+                    details.append(f"👶 Up to age {max_age}")
+            if max_quantity:
+                details.append(f"🎟️ Limit: {max_quantity} available")
+            
+            details_html = "<br>".join(details) if details else ""
+            
+            ticket_cards.append(f"""
+            <div class="ticket-card">
+                <div class="ticket-header">
+                    <span class="ticket-name">{name}</span>
+                    <span class="ticket-price">{price_display}</span>
+                </div>
+                {f'<div class="ticket-details">{details_html}</div>' if details_html else ''}
+            </div>
+            """)
+        
+        return "".join(ticket_cards)
+    
+    def _generate_action_buttons(self, can_create: bool, session_id: str, event_data: Dict[str, Any] = None) -> str:
         """Generate action buttons based on event readiness"""
         if can_create:
             return f"""
             <button class="btn btn-success" 
-                    hx-post="/api/ai/chat/{session_id}/create-event"
+                    hx-post="/chat/{session_id}/create-event"
                     hx-target="#event-preview"
                     hx-swap="innerHTML"
                     hx-include="[name='csrf_token']">
@@ -294,12 +453,48 @@ class EventService:
                 </p>
                 <div class="completion-progress">
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: 60%;"></div>
+                        <div class="progress-fill" style="width: {self._calculate_progress_percentage(event_data)}%;"></div>
                     </div>
-                    <small>60% Complete</small>
+                    <small>{self._calculate_progress_percentage(event_data)}% Complete</small>
                 </div>
             </div>
             """
+    
+    def _calculate_progress_percentage(self, event_data: Dict[str, Any] = None) -> int:
+        """Calculate event completion percentage based on available data"""
+        if not event_data:
+            return 0
+        
+        # Define essential fields and their weights
+        essential_fields = {
+            "title": 30,        # Title is most important (30%)
+            "date": 25,         # Date is very important (25%)
+            "description": 20,  # Description adds value (20%)
+            "location": 15,     # Location is important for in-person events (15%)
+            "tickets": 10       # Tickets complete the event (10%)
+        }
+        
+        progress = 0
+        
+        # Check each field
+        if event_data.get("title"):
+            progress += essential_fields["title"]
+        
+        if event_data.get("date") or event_data.get("start_date"):
+            progress += essential_fields["date"]
+        
+        if event_data.get("description"):
+            progress += essential_fields["description"]
+        
+        if event_data.get("location"):
+            progress += essential_fields["location"]
+        
+        # Check for tickets
+        tickets = event_data.get("tickets", [])
+        if tickets and len(tickets) > 0:
+            progress += essential_fields["tickets"]
+        
+        return min(progress, 100)  # Cap at 100%
     
     async def create_event_from_chat(
         self, 
@@ -403,7 +598,6 @@ class EventService:
             {"label": "Max Students", "value": str(event_data.get("max_pupils", "")), "required": False},
             {"label": "Min Age", "value": str(event_data.get("min_age", "")), "required": False},
             {"label": "Max Age", "value": str(event_data.get("max_age", "")), "required": False},
-            {"label": "Cost", "value": f"${event_data.get('cost', '')}" if event_data.get("cost") else "", "required": False},
             {"label": "Image URL", "value": event_data.get("image_url", ""), "required": False}
         ]
         
@@ -417,7 +611,7 @@ class EventService:
     
     def get_ai_create_event_page_data(self, user: User) -> Dict[str, Any]:
         """Get data for the AI event creation page"""
-        from app.main import generate_csrf_token
+        from app.utils.auth_utils import generate_csrf_token
         
         return {
             "current_user": user,
@@ -432,7 +626,6 @@ class EventService:
         title = draft.get("title", "Untitled Event")
         date = draft.get("date", None)
         location = draft.get("location", None)
-        cost = draft.get("cost", None)
         min_age = draft.get("min_age", None)
         max_age = draft.get("max_age", None)
         max_pupils = draft.get("max_pupils", None)
@@ -443,15 +636,6 @@ class EventService:
             details.append(f"Date: {date}")
         if location and location not in description:
             details.append(f"Location: {location}")
-        if cost not in (None, "") and (str(cost) not in description and "$" not in description):
-            try:
-                cost_val = float(cost)
-                if cost_val > 0:
-                    details.append(f"Cost: ${cost_val:.2f}")
-                else:
-                    details.append("Cost: Free")
-            except Exception:
-                details.append(f"Cost: {cost}")
         if min_age and (f"Ages {min_age}" not in description):
             if max_age:
                 details.append(f"Ages: {min_age}-{max_age}")

@@ -15,8 +15,8 @@ from app.models import User
 logger = logging.getLogger(__name__)
 
 
-# Core Dependencies - Use existing auth from main.py
-from app.main import get_current_user, require_admin
+# Core Dependencies - Use auth utils to avoid circular imports
+from app.utils.auth_utils import get_current_user, require_admin
 
 def require_authenticated_user(user=Depends(get_current_user)) -> User:
     """Require an authenticated user for AI endpoints"""

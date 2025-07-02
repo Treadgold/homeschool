@@ -1,48 +1,34 @@
 #!/usr/bin/env python3
 """
-Test script for diagnosing the LangChain AI agent.
-Run this to test the AI agent independently from the web interface.
+Simple test script for the LangChain agent service.
+This avoids circular imports by directly testing the agent service.
 """
 
 import asyncio
-import logging
-import sys
 import os
+import sys
 import uuid
 
 # Add the app directory to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from app.ai.services.react_agent_service import invoke_agent
-from app.ai_assistant import ai_manager
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-
-async def test_langchain_agent():
-    """Test the LangChain agent with a message designed to trigger tool use."""
+async def test_simple_langchain():
+    """Test the LangChain agent directly."""
     
-    print("🧪 Testing LangChain Agent...")
+    print("🧪 Testing LangChain Agent (Simple)...")
     print("=" * 50)
     
-    # Use the currently configured model
-    try:
-        config = ai_manager.get_current_model_config()
-        if not config:
-            print("❌ No model configured. Please check your AI configuration.")
-            return
-        
-        model_name = config.model_name
-        print(f"   Using Model: {model_name}")
-        print(f"   Endpoint: {config.endpoint_url}")
-
-    except Exception as e:
-        print(f"❌ Could not get model configuration: {e}")
-        return
-
+    # Import here to avoid circular imports
+    from app.ai.services.react_agent_service import invoke_agent
+    
+    # Use a test model - you can change this to match your available models
+    model_name = "qwen3:14b"  # Change this to your preferred model
+    
+    print(f"   Using Model: {model_name}")
+    
+    # Set up environment
+    os.environ.setdefault("OLLAMA_ENDPOINT", "http://host.docker.internal:11434")
+    
     # A unique session ID for this test run
     test_session_id = f"test-run-{uuid.uuid4()}"
     print(f"   Test Session ID: {test_session_id}")
@@ -76,9 +62,6 @@ async def test_langchain_agent():
                     if isinstance(call_info, dict):
                         tool_name = call_info.get("name", "unknown")
                         tool_input = call_info.get("arguments", {})
-                    elif hasattr(call_info, "tool"):
-                        tool_name = call_info.tool
-                        tool_input = getattr(call_info, "tool_input", {})
                     else:
                         tool_name = str(call_info)
                         tool_input = "unknown"
@@ -97,4 +80,4 @@ async def test_langchain_agent():
         traceback.print_exc()
 
 if __name__ == "__main__":
-    asyncio.run(test_langchain_agent()) 
+    asyncio.run(test_simple_langchain()) 

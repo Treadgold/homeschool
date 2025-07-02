@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Ollama is running in windows. Our app is running in 4 docker containers, inside WSL. The API endpoint works, but we can't spin up ollama for testing, we can only point at the API end point.

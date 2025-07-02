@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+We often find this circular import when you docker exec and try to run individual tests. Remember we want to update tests which run at build time. Orfrom within the app. We can put test scripts in a series of butttons on the admin screen if you want. But never run tests individually in the terminal if we can help it.
